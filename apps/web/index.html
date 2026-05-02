@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HPM — HAProxy Packet Manager</title>
+    <meta key="title" content="HPM" property="og:title" />
+    <meta
+      content="HAProxy Packet Manager: visual control plane for HAProxy clusters."
+      name="description"
+    />
+    <script>
+      // Inline pre-paint, чтобы не было FOUC при смене темы
+      (function () {
+        try {
+          var saved = localStorage.getItem('theme');
+          var prefers = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          var theme = saved || prefers;
+          document.documentElement.classList.toggle('dark', theme === 'dark');
+        } catch (e) {
+          /* noop */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

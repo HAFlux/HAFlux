@@ -1,0 +1,170 @@
+---
+- name: Ensure src dir exists (build mode)
+  ansible.builtin.file:
+    path: "{{ hapilot_install_dir }}/src"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: hapilot_image_source == "build"
+
+# rsync с контроллера, чтобы не зависеть от GitHub creds: деплоим то, что
+# лежит локально у Ansible-оператора (включая возможные hotfix'ы).
+- name: Sync HAPilot sources from controller (build mode)
+  ansible.posix.synchronize:
+    src: "{{ playbook_dir }}/../../../"
+    dest: "{{ hapilot_install_dir }}/src/"
+    delete: true
+    recursive: true
+    rsync_opts:
+      - "--exclude=node_modules"
+      - "--exclude=.git"
+      - "--exclude=dist"
+      - "--exclude=build"
+      - "--exclude=.cache"
+      - "--exclude=.vite"
+      - "--exclude=*.tsbuildinfo"
+      - "--exclude=deploy/ansible/inventory/hosts.ini"
+      - "--exclude=deploy/ansible/.vault_pass"
+      - "--exclude=deploy/docker/.env"
+  when: hapilot_image_source == "build"
+
+## Генерируем секреты НА сервере (через openssl), чтобы они не проходили через
+## контроллер Ansible. Идемпотентность через `creates:` — повторный запуск не
+## ротирует ключи. Файлы остаются в hapilot_secrets_dir с режимом 0600.
+
+- name: Generate JWT_SECRET on target (one-time)
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      umask 077
+      openssl rand -base64 32 | tr -d '\n' > {{ hapilot_secrets_dir }}/jwt_secret
+    executable: /bin/bash
+    creates: "{{ hapilot_secrets_dir }}/jwt_secret"
+
+- name: Generate ENCRYPTION_KEY on target (one-time)
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      umask 077
+      openssl rand -base64 32 | tr -d '\n' > {{ hapilot_secrets_dir }}/encryption_key
+    executable: /bin/bash
+    creates: "{{ hapilot_secrets_dir }}/encryption_key"
+
+- name: Generate DB_PASSWORD on target (one-time)
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      umask 077
+      openssl rand -base64 24 | tr -d '/+=\n' | head -c 32 > {{ hapilot_secrets_dir }}/db_password
+    executable: /bin/bash
+    creates: "{{ hapilot_secrets_dir }}/db_password"
+
+- name: Read secrets back into facts
+  ansible.builtin.slurp:
+    src: "{{ hapilot_secrets_dir }}/{{ item }}"
+  register: _hapilot_secret_files
+  loop:
+    - jwt_secret
+    - encryption_key
+    - db_password
+  no_log: true
+
+- name: Map secrets to named facts
+  ansible.builtin.set_fact:
+    hapilot_jwt_secret:    "{{ (_hapilot_secret_files.results[0].content | b64decode) }}"
+    hapilot_encryption_key: "{{ (_hapilot_secret_files.results[1].content | b64decode) }}"
+    hapilot_db_password:   "{{ (_hapilot_secret_files.results[2].content | b64decode) }}"
+  no_log: true
+
+## ── HAProxy data dir + bootstrap ─────────────────────────────────────
+- name: Ensure haproxy data tree exists
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ hapilot_haproxy_data_dir }}"
+    - "{{ hapilot_haproxy_data_dir }}/conf.d"
+    - "{{ hapilot_haproxy_data_dir }}/certs"
+    - "{{ hapilot_haproxy_data_dir }}/maps"
+    - "{{ hapilot_haproxy_data_dir }}/acl"
+    - "{{ hapilot_haproxy_data_dir }}/errors"
+    - "{{ hapilot_haproxy_data_dir }}/lua"
+    - "{{ hapilot_haproxy_data_dir }}/spoe"
+
+- name: Place bootstrap haproxy.cfg (only if missing)
+  ansible.builtin.copy:
+    dest: "{{ hapilot_haproxy_data_dir }}/haproxy.cfg"
+    owner: root
+    group: root
+    mode: "0644"
+    force: false
+    content: |
+      # Bootstrap haproxy.cfg — будет перезаписан HAPilot панелью при первом
+      # Apply. До этого момента HAProxy сам выступает входной точкой для
+      # панели: /api/* → api:3000, всё остальное → web (nginx со статикой).
+      global
+        maxconn 4000
+        log stdout local0 info
+
+      defaults
+        mode http
+        log global
+        option httplog
+        option dontlognull
+        timeout connect 5s
+        timeout client  30s
+        timeout server  60s
+
+      frontend fe_panel
+        bind *:80
+        default_backend be_panel
+
+      backend be_panel
+        option httpchk GET /health
+        server api 127.0.0.1:{{ hapilot_api_port }} check
+
+- name: Render docker compose for control-plane
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ hapilot_install_dir }}/compose.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart compose
+
+- name: Render .env for compose
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ hapilot_install_dir }}/.env"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: restart compose
+  no_log: true
+
+- name: Open UI port in firewall
+  community.general.ufw:
+    rule: allow
+    port: "{{ hapilot_web_port }}"
+    proto: tcp
+  when: hapilot_enable_ufw | default(false)
+
+- name: Open API port in firewall (для агентов на других машинах)
+  community.general.ufw:
+    rule: allow
+    port: "{{ hapilot_api_port }}"
+    proto: tcp
+  when: hapilot_enable_ufw | default(false)
+
+- name: Bring up control-plane stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ hapilot_install_dir }}"
+    files:
+      - compose.yml
+    state: present
+    pull: "{{ 'always' if hapilot_image_source == 'pull' else 'missing' }}"
+    build: "{{ 'always' if hapilot_image_source == 'build' else 'never' }}"

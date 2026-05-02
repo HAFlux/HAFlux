@@ -1,0 +1,99 @@
+# HPM — single-host docker compose (demo / self-host).
+#
+# Архитектура: panel = api контейнер (NestJS + Fastify), который сам отдаёт
+# и REST (/api/v1/*), и SPA (статика Vite-build из /app/public). Никакого
+# nginx — всё проксируется через сам HAProxy. api пишет haproxy.cfg в
+# ./haproxy-data/, haproxy монтирует это дерево read-only. Reload через
+# docker kill -s USR2 haproxy-balancer.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    volumes:
+      - redis_data:/data
+    networks: [internal]
+
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    image: hapilot/api:dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgres://${POSTGRES_USER}:${DB_PASSWORD}@db:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      ALLOWED_ORIGINS: http://${PUBLIC_HOST}
+      BOOTSTRAP_ROOT_EMAIL: ${BOOTSTRAP_ROOT_EMAIL}
+      BOOTSTRAP_ROOT_PASSWORD: ${BOOTSTRAP_ROOT_PASSWORD}
+      HAPROXY_CONTAINER_NAME: haproxy-balancer
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_started }
+    networks: [internal, edge]
+    ports:
+      # api слушает локально :3000. HAProxy на host network проксирует на 127.0.0.1:3000.
+      - "127.0.0.1:3000:3000"
+    volumes:
+      # api пишет конфиг сюда (rw); haproxy читает то же самое (ro)
+      - ./haproxy-data:/haproxy-data
+      # для reload (docker kill -s USR2) контейнера haproxy
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  haproxy:
+    image: haproxy:3.1.17-alpine
+    container_name: haproxy-balancer
+    network_mode: host
+    user: "0:0"
+    volumes:
+      - ./haproxy-data/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ./haproxy-data/conf.d:/usr/local/etc/haproxy/conf.d:ro
+      - ./haproxy-data/certs:/etc/haproxy/certs:ro
+      - ./haproxy-data/maps:/etc/haproxy/maps:ro
+      - ./haproxy-data/acl:/etc/haproxy/acl:ro
+      - ./haproxy-data/errors:/etc/haproxy/errors:ro
+      - ./haproxy-data/lua:/etc/haproxy/lua:ro
+      - ./haproxy-data/spoe:/etc/haproxy/spoe:ro
+    command:
+      - haproxy
+      - -W
+      - -db
+      - -f
+      - /usr/local/etc/haproxy/haproxy.cfg
+      - -f
+      - /usr/local/etc/haproxy/conf.d/
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
+    restart: unless-stopped
+
+volumes:
+  db_data: {}
+  redis_data: {}
+
+networks:
+  edge: {}
+  internal:
+    internal: true

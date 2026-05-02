@@ -1,0 +1,112 @@
+# Сгенерировано Ansible (роль control_plane). Не редактировать вручную.
+{% if hapilot_image_source == "build" %}
+{% set api_image = "hapilot/api:local" %}
+{% set web_image = "hapilot/web:local" %}
+{% else %}
+{% set api_image = hapilot_image_registry ~ "/waf-api:" ~ hapilot_image_tag %}
+{% set web_image = hapilot_image_registry ~ "/waf-web:" ~ hapilot_image_tag %}
+{% endif %}
+
+services:
+  db:
+    image: postgres:{{ hapilot_postgres_version }}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:{{ hapilot_redis_version }}
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    volumes:
+      - redis_data:/data
+    networks: [internal]
+
+  api:
+{% if hapilot_image_source == "build" %}
+    build:
+      context: {{ hapilot_install_dir }}/src
+      dockerfile: apps/api/Dockerfile
+{% endif %}
+    image: {{ api_image }}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgres://${POSTGRES_USER}:${DB_PASSWORD}@db:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      BOOTSTRAP_ROOT_EMAIL: ${BOOTSTRAP_ROOT_EMAIL}
+      BOOTSTRAP_ROOT_PASSWORD: ${BOOTSTRAP_ROOT_PASSWORD}
+      HAPROXY_CONTAINER_NAME: {{ hapilot_haproxy_container_name }}
+    volumes:
+      - {{ hapilot_haproxy_data_dir }}:/haproxy-data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_started }
+    networks: [internal, edge]
+    ports:
+      - "{{ hapilot_api_port }}:3000"
+
+  web:
+{% if hapilot_image_source == "build" %}
+    build:
+      context: {{ hapilot_install_dir }}/src
+      dockerfile: apps/web/Dockerfile
+{% endif %}
+    image: {{ web_image }}
+    restart: unless-stopped
+    depends_on: [api]
+    networks: [edge]
+    ports:
+      - "{{ hapilot_web_port }}:80"
+
+  haproxy:
+    image: {{ hapilot_haproxy_image }}
+    container_name: {{ hapilot_haproxy_container_name }}
+    network_mode: host
+    user: "0:0"
+    volumes:
+      - {{ hapilot_haproxy_data_dir }}/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - {{ hapilot_haproxy_data_dir }}/conf.d:/usr/local/etc/haproxy/conf.d:ro
+      - {{ hapilot_haproxy_data_dir }}/certs:/etc/haproxy/certs:ro
+      - {{ hapilot_haproxy_data_dir }}/maps:/etc/haproxy/maps:ro
+      - {{ hapilot_haproxy_data_dir }}/acl:/etc/haproxy/acl:ro
+      - {{ hapilot_haproxy_data_dir }}/errors:/etc/haproxy/errors:ro
+      - {{ hapilot_haproxy_data_dir }}/lua:/etc/haproxy/lua:ro
+      - {{ hapilot_haproxy_data_dir }}/spoe:/etc/haproxy/spoe:ro
+    command:
+      - haproxy
+      - -W
+      - -db
+      - -f
+      - /usr/local/etc/haproxy/haproxy.cfg
+      - -f
+      - /usr/local/etc/haproxy/conf.d/
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
+    restart: unless-stopped
+
+volumes:
+  db_data: {}
+  redis_data: {}
+
+networks:
+  edge: {}
+  internal:
+    internal: true

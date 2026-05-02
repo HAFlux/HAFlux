@@ -1,0 +1,437 @@
+@import 'tailwindcss';
+@import '@heroui/styles';
+@import '@fontsource-variable/geist/index.css';
+@import '@fontsource-variable/geist-mono/index.css';
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * HAPilot — cyberpunk monochrome.
+ * Pure black/white контраст, тонкие хайерлайн рамки 1px, малый радиус 2px,
+ * Geist Mono для всех UI-меток (sidebar, кнопки, лейблы), Geist Sans для
+ * body-текста. На фоне — едва заметные сканлайны.
+ */
+
+@theme {
+  --font-sans:
+    'Geist Variable', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, sans-serif;
+  --font-mono:
+    'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --color-bg: #ffffff;
+  --color-fg: #000000;
+  --color-surface: #f5f5f5;
+  --color-muted: #6b6b6b;
+  --color-separator: rgba(0, 0, 0, 0.18);
+  --color-accent: #000000;
+
+  /* Motion — единая «плавность» интерфейса */
+  --motion-ease-out: cubic-bezier(0.33, 1, 0.68, 1);
+  --motion-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --motion-fast: 140ms;
+  --motion-normal: 240ms;
+  --motion-slow: 380ms;
+}
+
+.dark {
+  --color-bg: #000000;
+  --color-fg: #ffffff;
+  --color-surface: #0c0c0c;
+  --color-muted: #8f8f8f;
+  --color-separator: rgba(255, 255, 255, 0.18);
+  --color-accent: #ffffff;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-feature-settings:
+    'cv02', 'cv03', 'cv04', 'cv11',
+    'ss01', 'ss03';
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+  transition:
+    background-color var(--motion-normal) var(--motion-ease-out),
+    color var(--motion-normal) var(--motion-ease-out);
+  background-image: repeating-linear-gradient(
+    180deg,
+    transparent 0,
+    transparent 3px,
+    color-mix(in srgb, var(--color-fg) 3%, transparent) 3px,
+    color-mix(in srgb, var(--color-fg) 3%, transparent) 4px
+  );
+}
+
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--font-mono);
+}
+
+/* ─── Cyberpunk utilities ───────────────────────────────────────────── */
+
+.cyber-mono {
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+.cyber-label {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.cyber-heading {
+  font-family: var(--font-mono);
+  letter-spacing: -0.01em;
+  font-weight: 600;
+}
+
+.cyber-heading::before {
+  content: '> ';
+  opacity: 0.6;
+}
+
+.cyber-bracket {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4ch;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+.cyber-bracket::before {
+  content: '[';
+  opacity: 0.5;
+}
+.cyber-bracket::after {
+  content: ']';
+  opacity: 0.5;
+}
+
+.cyber-tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid var(--color-separator);
+  background: var(--color-surface);
+  color: var(--color-fg);
+  padding: 0.125rem 0.5rem;
+  border-radius: 2px;
+  transition:
+    border-color var(--motion-normal) var(--motion-ease-out),
+    background-color var(--motion-normal) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
+}
+
+.cyber-input {
+  height: 2.5rem;
+  width: 100%;
+  border: 1px solid var(--color-separator);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  border-radius: 2px;
+  padding: 0 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  transition:
+    border-color var(--motion-normal) var(--motion-ease-out),
+    box-shadow var(--motion-normal) var(--motion-ease-out),
+    background-color var(--motion-normal) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
+}
+.cyber-input::placeholder {
+  color: var(--color-muted);
+  opacity: 0.7;
+  transition: opacity var(--motion-fast) var(--motion-ease-out);
+}
+.cyber-input:focus {
+  outline: none;
+  border-color: var(--color-fg);
+  box-shadow: 0 0 0 1px var(--color-fg);
+}
+
+.cyber-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.5rem;
+  padding: 0 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid var(--color-fg);
+  border-radius: 2px;
+  background: var(--color-fg);
+  color: var(--color-bg);
+  cursor: pointer;
+  transition:
+    background-color var(--motion-normal) var(--motion-ease-out),
+    color var(--motion-normal) var(--motion-ease-out),
+    border-color var(--motion-normal) var(--motion-ease-out),
+    transform var(--motion-fast) var(--motion-ease-out),
+    opacity var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-normal) var(--motion-ease-out);
+}
+.cyber-btn:hover {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  transform: translateY(-1px);
+}
+.cyber-btn:active {
+  transform: translateY(0);
+}
+.cyber-btn:disabled,
+.cyber-btn[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cyber-btn-ghost {
+  background: transparent;
+  color: var(--color-fg);
+  border: 1px solid var(--color-separator);
+}
+.cyber-btn-ghost:hover {
+  border-color: var(--color-fg);
+  background: color-mix(in srgb, var(--color-fg) 7%, transparent);
+}
+
+.cyber-card {
+  border: 1px solid var(--color-separator);
+  border-radius: 2px;
+  background: var(--color-bg);
+  transition:
+    border-color var(--motion-normal) var(--motion-ease-out),
+    box-shadow var(--motion-slow) var(--motion-ease-out),
+    background-color var(--motion-normal) var(--motion-ease-out);
+}
+
+/* Карточки-ссылки (дашборд и т.п.) — лёгкая «подъёмная» тень при hover */
+a.cyber-card:hover,
+.cyber-card-interactive:hover {
+  border-color: var(--color-fg);
+  box-shadow: 0 4px 24px color-mix(in srgb, var(--color-fg) 8%, transparent);
+}
+
+.cyber-divider {
+  border-top: 1px solid var(--color-separator);
+}
+
+.cyber-link {
+  color: var(--color-fg);
+  text-decoration: none;
+  border-bottom: 1px solid var(--color-separator);
+  transition:
+    border-color var(--motion-normal) var(--motion-ease-out),
+    color var(--motion-normal) var(--motion-ease-out),
+    opacity var(--motion-fast) var(--motion-ease-out);
+}
+.cyber-link:hover {
+  border-color: var(--color-fg);
+}
+
+/* Основная колонка — плавный скролл якорей */
+.hpm-content {
+  scroll-behavior: smooth;
+}
+
+/* Глобальные radius для всех HeroUI компонентов, что используем */
+button,
+input,
+select,
+textarea {
+  border-radius: 2px;
+}
+
+/* ─── Console-typing animations ──────────────────────────────────── */
+
+@keyframes blink-cursor {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.cyber-cursor::after {
+  content: '_';
+  display: inline-block;
+  margin-left: 2px;
+  animation: blink-cursor 900ms steps(1) infinite;
+  color: var(--color-fg);
+  font-weight: bold;
+}
+
+@keyframes typing-reveal {
+  from { width: 0 }
+  to { width: 100% }
+}
+
+.cyber-typing {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  border-right: 2px solid currentColor;
+  animation:
+    typing-reveal 1.4s steps(40, end),
+    blink-cursor 800ms steps(1) 1.5s infinite;
+}
+
+/* Screen reader only — полный текст при анимации печати */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ─── Mobile responsive ──────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .hpm-mobile-drawer .hpm-sidebar {
+    position: relative !important;
+    top: auto;
+    left: auto;
+    right: auto;
+    width: 100% !important;
+    max-width: 16rem;
+    height: 100% !important;
+    min-height: 100dvh;
+    z-index: auto;
+    flex-direction: column !important;
+    flex-wrap: nowrap;
+    border-bottom: none !important;
+    border-right: 1px solid var(--color-separator) !important;
+  }
+  /* Sidebar превращается в верхний бар */
+  .hpm-shell {
+    grid-template-columns: 1fr !important;
+  }
+  .hpm-sidebar {
+    position: fixed !important;
+    top: 0; left: 0; right: 0;
+    width: 100% !important;
+    height: auto !important;
+    z-index: 40;
+    background: var(--color-bg);
+    border-right: none !important;
+    border-bottom: 1px solid var(--color-separator);
+    flex-direction: row !important;
+    flex-wrap: wrap;
+  }
+  .hpm-content {
+    padding-top: 1rem;
+  }
+  .cyber-card {
+    padding: 1rem !important;
+  }
+  /* Уменьшаем header заголовков */
+  h1.cyber-heading {
+    font-size: 1.5rem !important;
+  }
+}
+
+/* Текст selection в инверсии */
+::selection {
+  background: var(--color-fg);
+  color: var(--color-bg);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-separator);
+  border-radius: 0;
+  transition: background-color var(--motion-normal) var(--motion-ease-out);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-fg);
+}
+
+/* ─── Modal overlay / panel (компонент Modal) ──────────────────────── */
+
+@keyframes hpm-modal-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes hpm-modal-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.hpm-modal-backdrop {
+  animation: hpm-modal-backdrop-in var(--motion-normal) var(--motion-ease-out) forwards;
+}
+
+.hpm-modal-panel {
+  animation: hpm-modal-panel-in var(--motion-slow) var(--motion-ease-out) forwards;
+}
+
+/* ─── Уважение к системным настройкам доступности ─────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  html,
+  .hpm-content {
+    scroll-behavior: auto;
+  }
+
+  body {
+    transition: none;
+  }
+
+  .cyber-btn:hover {
+    transform: none;
+  }
+
+  .hpm-modal-backdrop,
+  .hpm-modal-panel {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .cyber-card,
+  .cyber-input,
+  .cyber-btn,
+  .cyber-btn-ghost,
+  .cyber-tag,
+  .cyber-link {
+    transition-duration: 0.01ms !important;
+  }
+}

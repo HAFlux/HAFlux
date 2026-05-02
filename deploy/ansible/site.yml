@@ -1,0 +1,9 @@
+---
+# Полный rollout: control-plane + все HAProxy ноды.
+#
+# Запуск:
+#   ansible-galaxy install -r deploy/ansible/requirements.yml
+#   ansible-playbook -i deploy/ansible/inventory/hosts.ini deploy/ansible/site.yml
+
+- import_playbook: playbooks/control-plane.yml
+- import_playbook: playbooks/haproxy-node.yml

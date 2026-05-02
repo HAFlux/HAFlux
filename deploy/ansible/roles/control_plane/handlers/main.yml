@@ -1,0 +1,9 @@
+---
+- name: restart compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ hapilot_install_dir }}"
+    files:
+      - compose.yml
+    state: present
+    pull: missing
+    build: "{{ 'always' if hapilot_image_source == 'build' else 'never' }}"

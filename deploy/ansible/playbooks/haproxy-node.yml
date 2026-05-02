@@ -1,0 +1,10 @@
+---
+- name: Deploy HAProxy node
+  hosts: haproxy_nodes
+  become: true
+  roles:
+    - common
+    - sysctl_tuning
+    - docker
+    - { role: xanmod, when: hapilot_install_xanmod | default(false) }
+    - haproxy_node

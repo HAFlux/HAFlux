@@ -1,0 +1,64 @@
+---
+## ── Ulimits для всех процессов (видится HAProxy через docker ulimits) ──
+- name: Bump nofile system-wide via /etc/security/limits.d
+  ansible.builtin.copy:
+    dest: /etc/security/limits.d/99-hapilot.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      * soft nofile 1048576
+      * hard nofile 1048576
+      root soft nofile 1048576
+      root hard nofile 1048576
+
+## ── sysctl: tuning под HAProxy с большим количеством соединений ──────
+- name: Tune sysctl (network + fs limits)
+  ansible.posix.sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/99-hapilot.conf
+    state: present
+    reload: true
+  loop:
+    # Очередь слушающих сокетов (bind backlog)
+    - { name: net.core.somaxconn, value: "65535" }
+    - { name: net.ipv4.tcp_max_syn_backlog, value: "65535" }
+    # Буферы и производительность TCP
+    - { name: net.core.netdev_max_backlog, value: "65535" }
+    - { name: net.core.rmem_max, value: "16777216" }
+    - { name: net.core.wmem_max, value: "16777216" }
+    - { name: net.ipv4.tcp_rmem, value: "4096 87380 16777216" }
+    - { name: net.ipv4.tcp_wmem, value: "4096 65536 16777216" }
+    # Reuse TIME_WAIT-сокетов (больше ephemeral портов)
+    - { name: net.ipv4.tcp_tw_reuse, value: "1" }
+    - { name: net.ipv4.ip_local_port_range, value: "1024 65535" }
+    - { name: net.ipv4.tcp_fin_timeout, value: "15" }
+    # Защита от SYN-флуда
+    - { name: net.ipv4.tcp_syncookies, value: "1" }
+    # Файловые дескрипторы
+    - { name: fs.file-max, value: "2097152" }
+    - { name: fs.nr_open, value: "1048576" }
+    # BBR congestion control (если ядро поддерживает)
+    - { name: net.core.default_qdisc, value: "fq" }
+    - { name: net.ipv4.tcp_congestion_control, value: "bbr" }
+  ignore_errors: true # bbr может быть недоступен на старом ядре
+
+## ── UFW: открыть порты HAProxy ──────────────────────────────────────
+- name: Open HTTP / HTTPS / panel API ports
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "80"
+    - "443"
+    - "{{ hapilot_api_port | default(3000) }}"
+  when: hapilot_open_http_ports | default(true)
+
+- name: Allow HTTP/3 QUIC over UDP :443
+  community.general.ufw:
+    rule: allow
+    port: "443"
+    proto: udp
+  when: hapilot_open_http_ports | default(true)

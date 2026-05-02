@@ -1,0 +1,10 @@
+---
+# Куда монтируются разделы haproxy_data в контейнер
+haproxy_node_main_cfg_path: "{{ hapilot_haproxy_data_dir }}/haproxy.cfg"
+haproxy_node_confd_path:    "{{ hapilot_haproxy_data_dir }}/conf.d"
+haproxy_node_certs_path:    "{{ hapilot_haproxy_data_dir }}/certs"
+haproxy_node_maps_path:     "{{ hapilot_haproxy_data_dir }}/maps"
+haproxy_node_acl_path:      "{{ hapilot_haproxy_data_dir }}/acl"
+haproxy_node_errors_path:   "{{ hapilot_haproxy_data_dir }}/errors"
+haproxy_node_lua_path:      "{{ hapilot_haproxy_data_dir }}/lua"
+haproxy_node_spoe_path:     "{{ hapilot_haproxy_data_dir }}/spoe"

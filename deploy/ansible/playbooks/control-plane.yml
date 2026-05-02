@@ -1,0 +1,10 @@
+---
+- name: Deploy HAPilot control-plane (api + db + redis + haproxy)
+  hosts: control_plane
+  become: true
+  roles:
+    - common
+    - sysctl_tuning
+    - docker
+    - { role: xanmod, when: hapilot_install_xanmod | default(false) }
+    - control_plane

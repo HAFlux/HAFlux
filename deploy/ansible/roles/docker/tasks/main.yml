@@ -1,0 +1,185 @@
+---
+- name: Add Docker apt key
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/{{ ansible_facts.distribution | lower }}/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: "0644"
+    force: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Ensure /etc/apt/keyrings exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Add Docker apt repository
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [arch={{ ansible_facts.architecture | regex_replace('^x86_64$', 'amd64')
+                                              | regex_replace('^aarch64$', 'arm64') }}
+      signed-by=/etc/apt/keyrings/docker.asc]
+      https://download.docker.com/linux/{{ ansible_facts.distribution | lower }}
+      {{ ansible_facts.distribution_release }} stable
+    filename: docker
+    state: present
+    update_cache: true
+  when: ansible_facts.os_family == "Debian"
+
+- name: Install Docker engine + compose plugin
+  ansible.builtin.package:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+
+## ── Docker daemon: ротация логов + ограничение размера ──────────────
+## По умолчанию docker пишет логи в JSON unbounded — съедает диск. Ставим
+## json-file с ротацией: max-size=50m × max-file=4 на контейнер
+## (≈200мб per container), плюс живой systemd-journal как зеркало.
+## Live-restore оставляет контейнеры запущенными при рестарте dockerd.
+- name: Configure /etc/docker/daemon.json (log rotation + live-restore)
+  ansible.builtin.copy:
+    dest: /etc/docker/daemon.json
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "50m",
+          "max-file": "4",
+          "compress": "true"
+        },
+        "live-restore": true,
+        "default-ulimits": {
+          "nofile": { "Name": "nofile", "Hard": 1048576, "Soft": 1048576 }
+        }
+      }
+  notify: restart docker
+
+- name: Ensure docker service running and enabled
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Add invoking user to docker group (if non-root)
+  ansible.builtin.user:
+    name: "{{ ansible_user_id }}"
+    groups: docker
+    append: true
+  when: ansible_user_id != 'root'
+
+- name: Install Python docker SDK (for community.docker module)
+  ansible.builtin.pip:
+    name:
+      - docker
+      - requests
+    state: present
+    executable: pip3
+    extra_args: "--break-system-packages"
+
+## ── Авто-очистка docker через systemd timer ─────────────────────────
+## Раз в сутки прогоняем docker system prune + builder prune. Удаляются:
+##   - dangling images (созданные при ребилдах, без тега)
+##   - остановленные контейнеры старше 24ч
+##   - неиспользуемые volumes (только если флаг разрешён)
+##   - builder cache (BuildKit) старше 7 дней
+## Размер truncated json-логов уже контролируется max-size в daemon.json.
+- name: Install docker prune script
+  ansible.builtin.copy:
+    dest: /usr/local/sbin/docker-maintenance.sh
+    owner: root
+    group: root
+    mode: "0755"
+    content: |
+      #!/usr/bin/env bash
+      # Auto-installed by HPM Ansible. Runs daily via systemd timer.
+      set -euo pipefail
+
+      LOG=/var/log/docker-maintenance.log
+      log() { echo "[$(date -u +%FT%TZ)] $*" >> "$LOG"; }
+
+      log "=== docker-maintenance start ==="
+      log "before: $(docker system df --format '{{ "{{json .}}" }}' || true)"
+
+      # 1. Удалить dangling images, остановленные контейнеры старше 24ч,
+      #    неиспользуемые сети.
+      docker container prune -f --filter "until=24h" >> "$LOG" 2>&1 || true
+      docker image prune -af --filter "until=168h" >> "$LOG" 2>&1 || true
+      docker network prune -f --filter "until=24h" >> "$LOG" 2>&1 || true
+
+      # 2. BuildKit builder cache старше 7 дней.
+      docker builder prune -af --filter "until=168h" >> "$LOG" 2>&1 || true
+
+      # 3. Volumes prune НЕ автоматический — может удалить полезные данные.
+      #    Если хочется агрессивно — раскомментируй:
+      # docker volume prune -f >> "$LOG" 2>&1 || true
+
+      log "after:  $(docker system df --format '{{ "{{json .}}" }}' || true)"
+      log "=== docker-maintenance done ==="
+
+- name: Install docker-maintenance.service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/docker-maintenance.service
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=HPM docker maintenance (prune images/containers/builder cache)
+      After=docker.service
+      Requires=docker.service
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/sbin/docker-maintenance.sh
+
+- name: Install docker-maintenance.timer
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/docker-maintenance.timer
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=HPM docker maintenance (daily)
+
+      [Timer]
+      OnCalendar=daily
+      RandomizedDelaySec=1h
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+
+- name: Enable + start docker-maintenance.timer
+  ansible.builtin.systemd:
+    name: docker-maintenance.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+
+## ── Logrotate для нашего лога maintenance ───────────────────────────
+- name: Logrotate for docker-maintenance.log
+  ansible.builtin.copy:
+    dest: /etc/logrotate.d/docker-maintenance
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      /var/log/docker-maintenance.log {
+        weekly
+        rotate 4
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 0640 root root
+      }

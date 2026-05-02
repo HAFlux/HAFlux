@@ -1,0 +1,3 @@
+---
+control_plane_postgres_db: hapilot
+control_plane_postgres_user: hapilot

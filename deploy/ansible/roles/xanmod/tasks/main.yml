@@ -1,0 +1,52 @@
+---
+## XanMod kernel — оптимизированный mainline-форк под нагрузку.
+## Ставится opt-in через `hapilot_install_xanmod=true` в inventory.
+##
+## Источник: https://xanmod.org/ — apt-репозиторий пакетов linux-xanmod-*.
+## Меняет ядро системы, требует reboot после установки.
+
+- name: Skip XanMod (not requested)
+  ansible.builtin.meta: end_play
+  when: not (hapilot_install_xanmod | default(false))
+
+- name: Detect host CPU x86-64-v level (for proper XanMod variant)
+  ansible.builtin.shell: |
+    set -e
+    if /lib64/ld-linux-x86-64.so.2 --help 2>/dev/null | grep -q "x86-64-v4 (supported)"; then
+      echo v4
+    elif /lib64/ld-linux-x86-64.so.2 --help 2>/dev/null | grep -q "x86-64-v3 (supported)"; then
+      echo v3
+    elif /lib64/ld-linux-x86-64.so.2 --help 2>/dev/null | grep -q "x86-64-v2 (supported)"; then
+      echo v2
+    else
+      echo v1
+    fi
+  args:
+    executable: /bin/bash
+  register: _xanmod_v
+  changed_when: false
+
+- name: Add XanMod GPG key
+  ansible.builtin.get_url:
+    url: https://dl.xanmod.org/archive.key
+    dest: /etc/apt/keyrings/xanmod-archive-keyring.asc
+    mode: "0644"
+
+- name: Add XanMod apt repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/xanmod-archive-keyring.asc] http://deb.xanmod.org releases main"
+    filename: xanmod-release
+    state: present
+    update_cache: true
+
+- name: Install linux-xanmod-{{ _xanmod_v.stdout }}
+  ansible.builtin.apt:
+    name: "linux-xanmod-{{ _xanmod_v.stdout }}"
+    state: present
+
+- name: Notify reboot needed
+  ansible.builtin.debug:
+    msg: |
+      ⚠ XanMod kernel установлен. Перезагрузите систему (reboot), чтобы
+      загрузиться в новое ядро. После reboot проверьте: uname -r должен
+      содержать 'xanmod'.

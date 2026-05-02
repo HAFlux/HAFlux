@@ -1,0 +1,125 @@
+---
+# Подготовка ноды HAProxy: создаём пользователя для SSH-доступа панели,
+# раскладываем директории конфига, поднимаем контейнер haproxy.
+# Никакого custom-агента сверху — панель управляет нодой исключительно через
+# SSH (SFTP файлы + ssh-exec команд).
+
+- name: Ensure unprivileged user for HAPilot panel SSH access
+  ansible.builtin.user:
+    name: "{{ hapilot_node_user }}"
+    shell: /bin/bash
+    create_home: true
+    groups: docker
+    append: true
+    state: present
+
+- name: Ensure ~/.ssh exists
+  ansible.builtin.file:
+    path: "/home/{{ hapilot_node_user }}/.ssh"
+    state: directory
+    owner: "{{ hapilot_node_user }}"
+    group: "{{ hapilot_node_user }}"
+    mode: "0700"
+
+- name: Authorize HAPilot panel public key
+  ansible.posix.authorized_key:
+    user: "{{ hapilot_node_user }}"
+    key: "{{ hapilot_panel_pubkey }}"
+    state: present
+  when: hapilot_panel_pubkey | length > 0
+
+- name: Warn if no panel pubkey provided
+  ansible.builtin.debug:
+    msg: >-
+      hapilot_panel_pubkey is empty — node will be unreachable from the panel
+      until you append the panel SSH public key into
+      /home/{{ hapilot_node_user }}/.ssh/authorized_keys.
+  when: hapilot_panel_pubkey | length == 0
+
+- name: Ensure haproxy data directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ hapilot_node_user }}"
+    group: "{{ hapilot_node_user }}"
+    mode: "0755"
+  loop:
+    - "{{ hapilot_haproxy_data_dir }}"
+    - "{{ haproxy_node_confd_path }}"
+    - "{{ haproxy_node_certs_path }}"
+    - "{{ haproxy_node_maps_path }}"
+    - "{{ haproxy_node_acl_path }}"
+    - "{{ haproxy_node_errors_path }}"
+    - "{{ haproxy_node_lua_path }}"
+    - "{{ haproxy_node_spoe_path }}"
+
+- name: Place bootstrap haproxy.cfg (минимальный — будет перезаписан панелью)
+  ansible.builtin.copy:
+    dest: "{{ haproxy_node_main_cfg_path }}"
+    owner: "{{ hapilot_node_user }}"
+    group: "{{ hapilot_node_user }}"
+    mode: "0644"
+    force: false
+    content: |
+      # Bootstrap haproxy.cfg — будет полностью перезаписан HAPilot.
+      global
+        maxconn 4000
+        daemon
+        log stdout local0 info
+        stats socket /var/run/haproxy/admin.sock mode 0660 level admin expose-fd listeners
+
+      defaults
+        mode http
+        log global
+        option httplog
+        timeout connect 5s
+        timeout client  30s
+        timeout server  30s
+
+- name: Run haproxy container
+  community.docker.docker_container:
+    name: "{{ hapilot_haproxy_container_name }}"
+    image: "{{ hapilot_haproxy_image }}"
+    state: started
+    restart_policy: unless-stopped
+    network_mode: host
+    user: "0:0"
+    ulimits:
+      - nofile:1048576:1048576
+    volumes:
+      - "{{ haproxy_node_main_cfg_path }}:/usr/local/etc/haproxy/haproxy.cfg:ro"
+      - "{{ haproxy_node_confd_path }}:/usr/local/etc/haproxy/conf.d:ro"
+      - "{{ haproxy_node_certs_path }}:/etc/haproxy/certs:ro"
+      - "{{ haproxy_node_maps_path }}:/etc/haproxy/maps:ro"
+      - "{{ haproxy_node_acl_path }}:/etc/haproxy/acl:ro"
+      - "{{ haproxy_node_errors_path }}:/etc/haproxy/errors:ro"
+      - "{{ haproxy_node_lua_path }}:/etc/haproxy/lua:ro"
+      - "{{ haproxy_node_spoe_path }}:/etc/haproxy/spoe:ro"
+    command:
+      - haproxy
+      - -W
+      - -db
+      - -f
+      - /usr/local/etc/haproxy/haproxy.cfg
+      - -f
+      - /usr/local/etc/haproxy/conf.d/
+
+- name: Allow HTTP/HTTPS in firewall
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop: ["80", "443"]
+  when: hapilot_open_http_ports and (hapilot_enable_ufw | default(false))
+
+- name: Print connection summary for the panel
+  ansible.builtin.debug:
+    msg: |
+      Node ready. В панели заведите ноду со следующими параметрами:
+        transport      = SSH
+        sshHost        = {{ inventory_hostname }}
+        sshPort        = 22
+        sshUser        = {{ hapilot_node_user }}
+        haproxyDataDir = {{ hapilot_haproxy_data_dir }}
+        reloadMode     = CONTAINER
+        reloadTarget   = {{ hapilot_haproxy_container_name }}

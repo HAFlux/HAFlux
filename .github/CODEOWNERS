@@ -1,0 +1,9 @@
+# Default owners — будут запрошены на ревью каждого PR
+*                       @hapilot/maintainers
+
+# Зональные владельцы (раскомментировать по мере роста команды)
+# /apps/api/             @hapilot/backend
+# /apps/web/             @hapilot/frontend
+# /apps/agent/           @hapilot/platform
+# /docs/                 @hapilot/maintainers
+# /.github/              @hapilot/maintainers
