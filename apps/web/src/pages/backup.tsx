@@ -2,6 +2,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { PageHeader } from '@/components/page-header';
 import { ApiError, api } from '@/lib/api';
 
 export default function BackupPage() {
@@ -52,13 +53,11 @@ export default function BackupPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-2">
-        <span className="cyber-label">{t('backup.kicker')}</span>
-        <h1 className="cyber-heading text-3xl">{t('backup.title')}</h1>
-        <p className="text-sm" style={{ color: 'var(--color-muted)' }}>
-          {t('backup.subtitle')}
-        </p>
-      </div>
+      <PageHeader
+        kicker={t('backup.kicker')}
+        title={t('backup.title')}
+        subtitle={t('backup.subtitle')}
+      />
 
       <div
         className="cyber-card flex flex-col gap-3 px-5 py-4"

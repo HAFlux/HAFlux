@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
 import { Help } from '@/components/help';
+import { PageHeader } from '@/components/page-header';
+import { PanelLoader } from '@/components/panel-loader';
 import { api, ApiError } from '@/lib/api';
 import { Modal } from '@/components/modal';
 
@@ -35,24 +37,18 @@ export default function ClustersPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex items-end justify-between gap-4">
-        <div className="flex flex-col gap-2">
-          <span className="cyber-label">{t('clusters.kicker')}</span>
-          <h1 className="cyber-heading text-3xl">{t('clusters.title')}</h1>
-          <p className="text-sm" style={{ color: 'var(--color-muted)' }}>
-            {t('clusters.subtitle')}
-          </p>
-        </div>
-        <button type="button" className="cyber-btn" onClick={() => setCreateOpen(true)}>
-          {t('actions.newCluster')}
-        </button>
-      </div>
+      <PageHeader
+        kicker={t('clusters.kicker')}
+        title={t('clusters.title')}
+        subtitle={t('clusters.subtitle')}
+        right={
+          <button type="button" className="cyber-btn" onClick={() => setCreateOpen(true)}>
+            {t('actions.newCluster')}
+          </button>
+        }
+      />
 
-      {isLoading && (
-        <div className="cyber-mono text-sm" style={{ color: 'var(--color-muted)' }}>
-          {t('common.loading')}
-        </div>
-      )}
+      {isLoading && <PanelLoader message={t('common.loading')} />}
       {error && (
         <p className="cyber-mono text-sm">
           {t('common.error', { message: (error as Error).message })}

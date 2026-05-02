@@ -1,9 +1,10 @@
-import { Spinner } from '@heroui/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Modal } from '@/components/modal';
+import { PageHeader } from '@/components/page-header';
+import { PanelLoader } from '@/components/panel-loader';
 import { ApiError, api, type AccessGroupSummary } from '@/lib/api';
 
 function ClusterTabs({
@@ -74,23 +75,21 @@ export default function AccessGroupsPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex items-end justify-between gap-4">
-        <div className="flex flex-col gap-2">
-          <span className="cyber-label">{t('accessGroups.kicker')}</span>
-          <h1 className="cyber-heading text-3xl">{t('accessGroups.title')}</h1>
-          <p className="text-sm" style={{ color: 'var(--color-muted)' }}>
-            {t('accessGroups.subtitle')}
-          </p>
-        </div>
-        <button
-          type="button"
-          className="cyber-btn"
-          disabled={!activeClusterId}
-          onClick={() => setCreateOpen(true)}
-        >
-          {t('accessGroups.newGroup')}
-        </button>
-      </div>
+      <PageHeader
+        kicker={t('accessGroups.kicker')}
+        title={t('accessGroups.title')}
+        subtitle={t('accessGroups.subtitle')}
+        right={
+          <button
+            type="button"
+            className="cyber-btn"
+            disabled={!activeClusterId}
+            onClick={() => setCreateOpen(true)}
+          >
+            {t('accessGroups.newGroup')}
+          </button>
+        }
+      />
 
       {clusters.length === 0 ? (
         <div className="cyber-card px-5 py-5">
@@ -126,11 +125,7 @@ export default function AccessGroupsPage() {
         </div>
       ) : null}
 
-      {groupsQ.isLoading && activeClusterId && (
-        <div className="flex justify-center py-8">
-          <Spinner size="lg" />
-        </div>
-      )}
+      {groupsQ.isLoading && activeClusterId && <PanelLoader message={t('common.loading')} />}
 
       {groupsQ.data && groupsQ.data.length === 0 && (
         <div className="cyber-card px-5 py-5">
@@ -364,9 +359,7 @@ function AccessGroupFormModal({
       }
     >
       {loadingDetail ? (
-        <div className="flex justify-center py-8">
-          <Spinner size="lg" />
-        </div>
+        <PanelLoader message={t('common.loading')} />
       ) : (
         <form className="flex flex-col gap-5">
           <label className="flex flex-col gap-1.5">

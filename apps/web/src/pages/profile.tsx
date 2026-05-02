@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
+import { PageHeader } from '@/components/page-header';
 import { api, ApiError } from '@/lib/api';
 
 export default function ProfilePage() {
@@ -55,13 +56,11 @@ export default function ProfilePage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-2">
-        <span className="cyber-label">{t('profile.kicker')}</span>
-        <h1 className="cyber-heading text-3xl">{t('profile.title')}</h1>
-        <p className="text-sm" style={{ color: 'var(--color-muted)' }}>
-          {t('profile.subtitle')}
-        </p>
-      </div>
+      <PageHeader
+        kicker={t('profile.kicker')}
+        title={t('profile.title')}
+        subtitle={t('profile.subtitle')}
+      />
 
       {meQ.isLoading && (
         <div className="cyber-mono text-sm" style={{ color: 'var(--color-muted)' }}>

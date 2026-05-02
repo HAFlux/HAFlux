@@ -435,3 +435,97 @@ textarea {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ─── Panel loader / progress bar ─────────────────────────────────────── */
+
+.cyber-progress {
+  position: relative;
+  height: 6px;
+  background: var(--color-separator);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.cyber-progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  background: var(--color-fg);
+  width: 0;
+  transition: width 80ms linear;
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0,
+    transparent 6px,
+    rgba(0, 0, 0, 0.18) 6px,
+    rgba(0, 0, 0, 0.18) 7px
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cyber-progress-fill {
+    transition: none;
+  }
+}
+
+/* ─── Select / ListBox popover (cyber-themed) ─────────────────────────── */
+
+.cyber-popover,
+.hpm-listbox {
+  background: var(--color-bg);
+  border: 1px solid var(--color-separator);
+  border-radius: 2px;
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  min-width: var(--radix-popper-anchor-width, 100%);
+  max-height: 320px;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.cyber-popover :is([role='listbox'], ul) {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.cyber-popover-item,
+.cyber-popover :is([role='option'], li) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 2px;
+  cursor: pointer;
+  color: var(--color-fg);
+  outline: none;
+  user-select: none;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.cyber-popover :is([role='option'], li):hover,
+.cyber-popover-item:hover,
+.cyber-popover [data-hover='true'],
+.cyber-popover [data-focused='true'],
+.cyber-popover [data-focus-visible='true'] {
+  background: var(--color-fg);
+  color: var(--color-bg);
+}
+
+.cyber-popover [data-selected='true'],
+.cyber-popover [aria-selected='true'] {
+  background: var(--color-fg);
+  color: var(--color-bg);
+}
+
+.cyber-popover [data-disabled='true'],
+.cyber-popover [aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

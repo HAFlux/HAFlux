@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { PageHeader } from '@/components/page-header';
+import { PanelLoader } from '@/components/panel-loader';
 import { ApiError, api } from '@/lib/api';
 
 const HTTP_ERROR_CODES = [400, 403, 408, 500, 502, 503, 504] as const;
@@ -96,13 +98,11 @@ export default function ErrorPagesPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-2">
-        <span className="cyber-label">{t('errorPages.kicker')}</span>
-        <h1 className="cyber-heading text-3xl">{t('errorPages.title')}</h1>
-        <p className="text-sm" style={{ color: 'var(--color-muted)' }}>
-          {t('errorPages.subtitle')}
-        </p>
-      </div>
+      <PageHeader
+        kicker={t('errorPages.kicker')}
+        title={t('errorPages.title')}
+        subtitle={t('errorPages.subtitle')}
+      />
 
       {clusters.length === 0 ? (
         <div className="cyber-card px-5 py-5">
@@ -119,11 +119,7 @@ export default function ErrorPagesPage() {
         />
       )}
 
-      {activeClusterId && filesQ.isLoading && (
-        <div className="cyber-mono text-sm" style={{ color: 'var(--color-muted)' }}>
-          {t('errorPages.loading')}
-        </div>
-      )}
+      {activeClusterId && filesQ.isLoading && <PanelLoader message={t('errorPages.loading')} />}
 
       {activeClusterId && filesQ.isError && (
         <p className="cyber-mono text-sm">

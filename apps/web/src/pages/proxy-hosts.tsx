@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Help } from '@/components/help';
+import { PageHeader } from '@/components/page-header';
+import { PanelLoader } from '@/components/panel-loader';
 import { Modal } from '@/components/modal';
 import {
   ApiError,
@@ -61,23 +63,21 @@ export default function ProxyHostsPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="flex flex-col gap-2">
-          <span className="cyber-label">{t('proxyHosts.kicker')}</span>
-          <h1 className="cyber-heading text-3xl">{t('proxyHosts.title')}</h1>
-          <p className="text-sm" style={{ color: 'var(--color-muted)' }}>
-            {t('proxyHosts.subtitle')}
-          </p>
-        </div>
-        <button
-          type="button"
-          className="cyber-btn"
-          disabled={!activeClusterId}
-          onClick={() => setCreateOpen(true)}
-        >
-          {t('actions.newProxyHost')}
-        </button>
-      </div>
+      <PageHeader
+        kicker={t('proxyHosts.kicker')}
+        title={t('proxyHosts.title')}
+        subtitle={t('proxyHosts.subtitle')}
+        right={
+          <button
+            type="button"
+            className="cyber-btn"
+            disabled={!activeClusterId}
+            onClick={() => setCreateOpen(true)}
+          >
+            {t('actions.newProxyHost')}
+          </button>
+        }
+      />
 
       {clusters.length === 0 ? (
         <div className="cyber-card px-5 py-5">
@@ -94,11 +94,7 @@ export default function ProxyHostsPage() {
         />
       )}
 
-      {hostsQ.isLoading && (
-        <div className="cyber-mono text-sm" style={{ color: 'var(--color-muted)' }}>
-          {t('proxyHosts.loadingHosts')}
-        </div>
-      )}
+      {hostsQ.isLoading && <PanelLoader message={t('proxyHosts.loadingHosts')} />}
 
       {hostsQ.data && hostsQ.data.length === 0 && (
         <div className="cyber-card px-5 py-5">
@@ -444,7 +440,7 @@ function ProxyHostStatsPanel({ hostId }: { hostId: string }) {
                 <Select.Value />
                 <Select.Indicator />
               </Select.Trigger>
-              <Select.Popover>
+              <Select.Popover className="cyber-popover">
                 <ListBox>
                   {refreshOptions.map((o) => (
                     <ListBox.Item
@@ -898,7 +894,7 @@ function ProxyHostFormModal({
                 <Select.Value />
                 <Select.Indicator />
               </Select.Trigger>
-              <Select.Popover>
+              <Select.Popover className="cyber-popover">
                 <ListBox>
                   <ListBox.Item className="font-mono text-sm" id="http" textValue="http">
                     http
@@ -1083,7 +1079,7 @@ function ProxyHostFormModal({
                       <Select.Value />
                       <Select.Indicator />
                     </Select.Trigger>
-                    <Select.Popover>
+                    <Select.Popover className="cyber-popover">
                       <ListBox>
                         <ListBox.Item
                           className="font-mono text-sm"

@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Modal } from '@/components/modal';
+import { PageHeader } from '@/components/page-header';
 import { ApiError, type Certificate, type DnsProvider, api } from '@/lib/api';
 
 const RESERVED_TLDS = new Set(['local', 'localhost', 'test', 'invalid', 'example']);
@@ -50,13 +51,11 @@ export default function CertificatesPage() {
 
   return (
     <div className="flex flex-col gap-10">
-      <div className="flex flex-col gap-2">
-        <span className="cyber-label">{t('certificates.kicker')}</span>
-        <h1 className="cyber-heading text-3xl">{t('certificates.title')}</h1>
-        <p className="text-sm" style={{ color: 'var(--color-muted)' }}>
-          {t('certificates.subtitle')}
-        </p>
-      </div>
+      <PageHeader
+        kicker={t('certificates.kicker')}
+        title={t('certificates.title')}
+        subtitle={t('certificates.subtitle')}
+      />
 
       <DnsProvidersSection
         providers={providers}
@@ -334,7 +333,7 @@ function IssueSection({
                 <Select.Value />
                 <Select.Indicator />
               </Select.Trigger>
-              <Select.Popover>
+              <Select.Popover className="cyber-popover">
                 <ListBox>
                   {allZones.map((z) => (
                     <ListBox.Item
@@ -411,7 +410,7 @@ function IssueSection({
                 <Select.Value />
                 <Select.Indicator />
               </Select.Trigger>
-              <Select.Popover>
+              <Select.Popover className="cyber-popover">
                 <ListBox>
                   <ListBox.Item
                     className="font-mono text-sm"

@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 import pkg from '../../package.json';
+import { PageHeader } from '@/components/page-header';
 import { siteConfig } from '@/config/site';
 
 export default function HelpPage() {
@@ -9,13 +10,11 @@ export default function HelpPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-2">
-        <span className="cyber-label">{t('help.kicker')}</span>
-        <h1 className="cyber-heading text-3xl">{t('help.title')}</h1>
-        <p className="text-sm" style={{ color: 'var(--color-muted)' }}>
-          {t('help.lead')}
-        </p>
-      </div>
+      <PageHeader
+        kicker={t('help.kicker')}
+        title={t('help.title')}
+        subtitle={t('help.lead')}
+      />
 
       <section className="cyber-card px-5 py-5">
         <h2 className="cyber-heading text-lg">{t('help.glossaryTitle')}</h2>
