@@ -1,0 +1,63 @@
+# Node
+node_modules/
+.pnpm-store/
+dist/
+build/
+.next/
+.vite/
+.cache/
+coverage/
+*.tsbuildinfo
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+pnpm-debug.log*
+
+# Env
+.env
+.env.local
+.env.*.local
+deploy/docker/.env
+deploy/docker/secrets/
+
+# Editor / OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.recommended.json
+.claude/
+.DS_Store
+Thumbs.db
+
+# Prisma
+apps/api/prisma/migrations/dev.db*
+
+# Go
+apps/agent/bin/
+apps/agent/agent
+*.exe
+*.test
+*.out
+
+# Docker
+deploy/docker/data/
+deploy/docker/volumes/
+# haproxy-data — содержимое генерируется панелью; в репо держим только структуру.
+deploy/docker/haproxy-data/*
+!deploy/docker/haproxy-data/.gitkeep
+!deploy/docker/haproxy-data/conf.d/
+!deploy/docker/haproxy-data/conf.d/.gitkeep
+!deploy/docker/haproxy-data/README.md
+!deploy/docker/haproxy-data/haproxy.cfg
+
+# Ansible
+deploy/ansible/inventory/hosts.ini
+deploy/ansible/.vault_pass
+deploy/ansible/*.retry
+
+# Test outputs
+playwright-report/
+test-results/
+.nyc_output/

@@ -1,0 +1,9 @@
+# Default owners — будут запрошены на ревью каждого PR
+*                       @haflux/maintainers
+
+# Зональные владельцы (раскомментировать по мере роста команды)
+# /apps/api/             @haflux/backend
+# /apps/web/             @haflux/frontend
+# /apps/agent/           @haflux/platform
+# /docs/                 @haflux/maintainers
+# /.github/              @haflux/maintainers

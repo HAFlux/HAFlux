@@ -1,0 +1,768 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [citext]
+}
+
+// ─── Tenancy & Auth ──────────────────────────────────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members  Membership[]
+  clusters Cluster[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  displayName  String?
+  passwordHash String?
+  totpSecret   String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships Membership[]
+  oidcLinks   OidcLink[]
+  auditEvents AuditEvent[] @relation("ActorAudit")
+}
+
+model OidcLink {
+  id       String  @id @default(cuid())
+  userId   String
+  provider String
+  subject  String
+  email    String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, subject])
+}
+
+model Role {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  permissions Json
+  memberships Membership[]
+}
+
+model Membership {
+  id        String   @id @default(cuid())
+  userId    String
+  orgId     String
+  roleId    String
+  createdAt DateTime @default(now())
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org  Organization @relation(fields: [orgId],  references: [id], onDelete: Cascade)
+  role Role         @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, orgId])
+}
+
+// ─── Clusters & Nodes ────────────────────────────────────────────────────
+
+enum ClusterMode {
+  STANDALONE
+  ACTIVE_PASSIVE
+  ACTIVE_ACTIVE
+}
+
+enum NodeStatus {
+  ONLINE
+  OFFLINE
+  DEGRADED
+  UNKNOWN
+}
+
+enum NodeRole {
+  PRIMARY
+  SECONDARY
+}
+
+enum NodeTransport {
+  LOCAL    // haproxy на той же машине, что и api (через shared volume)
+  SSH      // удалённая нода: SFTP для файлов, ssh-exec для validate/reload
+}
+
+enum ReloadMode {
+  CONTAINER  // docker kill -s USR2 <container> или master CLI socket в общем volume
+  SYSTEMD    // systemctl reload haproxy
+  SIGNAL     // kill -USR2 $(cat /run/haproxy.pid)
+  MASTER_CLI // echo "reload" | socat - UNIX-CONNECT:/var/run/haproxy/admin.sock
+}
+
+model Cluster {
+  id        String      @id @default(cuid())
+  orgId     String
+  name      String
+  mode      ClusterMode @default(STANDALONE)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  org      Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  nodes    Node[]
+  versions ConfigVersion[]
+  global   HaproxyGlobal?
+  defaults HaproxyDefaults[]
+  frontends Frontend[]
+  backends  Backend[]
+  listens   Listen[]
+  peers     PeersSection[]
+  resolvers Resolver[]
+  userlists Userlist[]
+  httpErrors HttpErrorsSection[]
+  rings     Ring[]
+  caches    Cache[]
+  maps      MapFile[]
+  aclLists  AclListFile[]
+  errorFiles ErrorFile[]
+  luaScripts LuaScript[]
+  spoeAgents SpoeAgent[]
+  proxyHosts ProxyHost[]
+  accessGroups AccessGroup[]
+
+  @@unique([orgId, name])
+}
+
+model Node {
+  id             String        @id @default(cuid())
+  clusterId      String
+  name           String
+  transport      NodeTransport @default(LOCAL)
+  // адрес для SSH-доставки (для transport=SSH)
+  sshHost        String?
+  sshPort        Int?          @default(22)
+  sshUser        String?       @default("root")
+  // путь к корневой директории haproxy на ноде
+  haproxyDataDir String        @default("/etc/haproxy")
+  reloadMode     ReloadMode    @default(CONTAINER)
+  reloadTarget   String?       // имя контейнера / unit / pidfile / socket
+  haproxyVersion String?
+  status         NodeStatus    @default(UNKNOWN)
+  role           NodeRole      @default(PRIMARY)
+  lastSeenAt     DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  cluster Cluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+
+  @@unique([clusterId, name])
+}
+
+/// Приватный ключ панели для ssh-доступа к нодам (один на инсталляцию).
+/// Публичная часть кладётся в authorized_keys на нодах через Ansible.
+model SshKey {
+  id              String   @id @default(cuid())
+  comment         String   @default("haflux")
+  publicKey       String
+  encryptedPrivKey Bytes
+  createdAt       DateTime @default(now())
+}
+
+model ConfigVersion {
+  id          String   @id @default(cuid())
+  clusterId   String
+  gitSha      String
+  authorEmail String?
+  message     String
+  diffBlob    String   @db.Text
+  createdAt   DateTime @default(now())
+
+  cluster Cluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+
+  @@index([clusterId, createdAt])
+}
+
+// ─── HAProxy: глобальные секции ─────────────────────────────────────────
+
+/// Секция `global`. Один экземпляр на cluster.
+model HaproxyGlobal {
+  id              String   @id @default(cuid())
+  clusterId       String   @unique
+  maxconn         Int      @default(40000)
+  nbthread        Int?
+  cpuMap          String?  // "auto:1/1-N 0-(N-1)" итд (raw)
+  daemon          Boolean  @default(true)
+  pidfile         String?  @default("/var/run/haproxy.pid")
+  // ssl defaults
+  sslDefaultBindCiphers     String?
+  sslDefaultBindOptions     String?  @default("ssl-min-ver TLSv1.2 no-tls-tickets")
+  sslDefaultBindCiphersuites String?
+  sslDhParamFile            String?  @default("/etc/haproxy/dhparam.pem")
+  // tune
+  tune Json? // произвольные tune.* пары
+  // logs
+  logTargets Json? // [{ address, format, facility, level, ... }]
+  // master CLI socket для seamless reload (HAProxy 2.4+)
+  masterCliSocket String? @default("/var/run/haproxy/admin.sock")
+  // произвольный сырой блок (для директив, которые ещё не вынесены в UI)
+  rawExtra String? @db.Text
+
+  cluster Cluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+}
+
+/// Секция `defaults` (могут быть несколько именованных: `defaults http`, `defaults tcp`).
+model HaproxyDefaults {
+  id        String   @id @default(cuid())
+  clusterId String
+  name      String   @default("default") // null = безымянная секция
+  mode      String   @default("http")    // http | tcp
+  options   Json?    // { httplog: true, http-server-close: true, ... }
+  timeouts  Json?    // { client: "30s", server: "30s", ... }
+  errorfile Json?    // { 503: "/etc/haproxy/errors/503.http", ... }
+  logFormat String?  @db.Text
+  rawExtra  String?  @db.Text
+
+  cluster Cluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+
+  @@unique([clusterId, name])
+}
+
+// ─── HAProxy: frontends / backends / listen / servers / binds ───────────
+
+enum HaproxyMode {
+  http
+  tcp
+}
+
+enum BalanceAlgo {
+  roundrobin
+  static_rr
+  leastconn
+  source
+  uri
+  url_param
+  hdr
+  random
+}
+
+model Frontend {
+  id              String      @id @default(cuid())
+  clusterId       String
+  name            String
+  mode            HaproxyMode @default(http)
+  defaultBackend  String?
+  options         Json?
+  timeouts        Json?
+  logFormat       String?     @db.Text
+  rawExtra        String?     @db.Text
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  cluster   Cluster   @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+  binds     Bind[]
+  acls      AclRule[]
+  httpRules HttpRule[]
+  tcpRules  TcpRule[]
+
+  @@unique([clusterId, name])
+}
+
+model Bind {
+  id            String  @id @default(cuid())
+  frontendId    String?
+  listenId      String?
+  address       String  @default("*")  // *, 0.0.0.0, ipv6 etc.
+  port          Int
+  ssl           Boolean @default(false)
+  alpn          String? // "h2,http/1.1"
+  proto         String? // "h2", "h3"
+  crtListRef    String? // путь до crt-list файла, если используется
+  certificateId String? // одиночный сертификат
+  rawExtra      String?
+
+  frontend Frontend?    @relation(fields: [frontendId], references: [id], onDelete: Cascade)
+  listen   Listen?      @relation(fields: [listenId], references: [id], onDelete: Cascade)
+  cert     Certificate? @relation(fields: [certificateId], references: [id])
+}
+
+model Backend {
+  id          String      @id @default(cuid())
+  clusterId   String
+  name        String
+  mode        HaproxyMode @default(http)
+  balance     BalanceAlgo @default(roundrobin)
+  options     Json?       // { forwardfor: true, http-server-close: true, redispatch: true }
+  timeouts    Json?
+  httpCheck   Json?       // { uri, method, expectStatus, headers }
+  tcpCheck    Json?
+  cookieRules Json?       // { name, mode: insert|prefix|rewrite, secure, httponly, sameSite }
+  stickRules  Json?
+  rawExtra    String?     @db.Text
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  cluster   Cluster       @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+  servers   ServerEntry[]
+  acls      AclRule[]
+  httpRules HttpRule[]
+  tcpRules  TcpRule[]
+
+  @@unique([clusterId, name])
+}
+
+model Listen {
+  id        String      @id @default(cuid())
+  clusterId String
+  name      String
+  mode      HaproxyMode @default(tcp)
+  balance   BalanceAlgo @default(roundrobin)
+  options   Json?
+  timeouts  Json?
+  rawExtra  String?     @db.Text
+
+  cluster Cluster       @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+  binds   Bind[]
+  servers ServerEntry[]
+
+  @@unique([clusterId, name])
+}
+
+model ServerEntry {
+  id         String  @id @default(cuid())
+  backendId  String?
+  listenId   String?
+  name       String
+  address    String
+  port       Int
+  weight     Int     @default(1)
+  maxconn    Int?
+  maxqueue   Int?
+  check      Boolean @default(true)
+  checkInter Int?    @default(2000)
+  fall       Int?    @default(3)
+  rise       Int?    @default(2)
+  backup     Boolean @default(false)
+  disabled   Boolean @default(false)
+  ssl        Boolean @default(false)
+  verify     String? // "none" | "required"
+  sni        String?
+  rawExtra   String?
+
+  backend Backend? @relation(fields: [backendId], references: [id], onDelete: Cascade)
+  listen  Listen?  @relation(fields: [listenId],  references: [id], onDelete: Cascade)
+}
+
+// ─── ACL / http-request / tcp-request rules ──────────────────────────────
+
+model AclRule {
+  id         String  @id @default(cuid())
+  frontendId String?
+  backendId  String?
+  name       String
+  expression String  // например: hdr(host) -i example.com
+  rawExtra   String?
+
+  frontend Frontend? @relation(fields: [frontendId], references: [id], onDelete: Cascade)
+  backend  Backend?  @relation(fields: [backendId],  references: [id], onDelete: Cascade)
+}
+
+model HttpRule {
+  id         String  @id @default(cuid())
+  frontendId String?
+  backendId  String?
+  phase      String  // "request" | "response" | "after-response"
+  ordinal    Int     // порядок применения
+  action     String  // "deny" | "redirect" | "set-header" | "del-header" | "use_backend" | "redirect" ...
+  args       Json?   // параметры действия
+  conditions Json?   // [{ acl: "is_admin", invert: false }]
+  rawExtra   String?
+
+  frontend Frontend? @relation(fields: [frontendId], references: [id], onDelete: Cascade)
+  backend  Backend?  @relation(fields: [backendId],  references: [id], onDelete: Cascade)
+}
+
+model TcpRule {
+  id         String  @id @default(cuid())
+  frontendId String?
+  backendId  String?
+  phase      String  // "connection" | "content" | "session" | "response"
+  ordinal    Int
+  action     String
+  args       Json?
+  conditions Json?
+  rawExtra   String?
+
+  frontend Frontend? @relation(fields: [frontendId], references: [id], onDelete: Cascade)
+  backend  Backend?  @relation(fields: [backendId],  references: [id], onDelete: Cascade)
+}
+
+// ─── Прочие секции HAProxy ──────────────────────────────────────────────
+
+model PeersSection {
+  id        String  @id @default(cuid())
+  clusterId String
+  name      String
+  peers     Json    // [{ name, address, port }]
+  rawExtra  String? @db.Text
+
+  cluster Cluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+
+  @@unique([clusterId, name])
+}
+
+model Resolver {
+  id          String  @id @default(cuid())
+  clusterId   String
+  name        String
+  nameservers Json    // [{ name, address, port }]
+  options     Json?
+  rawExtra    String?
+
+  cluster Cluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+
+  @@unique([clusterId, name])
+}
+
+model Userlist {
+  id        String  @id @default(cuid())
+  clusterId String
+  name      String
+  // [{ user, password (hash) | groups[] }]
+  users     Json
+  groups    Json?
+  rawExtra  String? @db.Text
+
+  cluster Cluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+
+  @@unique([clusterId, name])
+}
+
+model HttpErrorsSection {
+  id        String  @id @default(cuid())
+  clusterId String
+  name      String
+  // { 503: errorFileId, 429: errorFileId }
+  mappings  Json
+  rawExtra  String?
+
+  cluster Cluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+
+  @@unique([clusterId, name])
+}
+
+model Ring {
+  id          String  @id @default(cuid())
+  clusterId   String
+  name        String
+  description String?
+  format      String? // raw | rfc3164 | rfc5424 | iso | ...
+  size        Int     @default(32764)
+  servers     Json    // [{ name, address, port, options }]
+  rawExtra    String?
+
+  cluster Cluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+
+  @@unique([clusterId, name])
+}
+
+model Cache {
+  id          String  @id @default(cuid())
+  clusterId   String
+  name        String
+  totalMaxSize Int    @default(4)   // MB
+  maxObjectSize Int   @default(8192) // bytes
+  maxAge      Int     @default(60)   // seconds
+  rawExtra    String?
+
+  cluster Cluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+
+  @@unique([clusterId, name])
+}
+
+// ─── Модули: файлы вне haproxy.cfg ──────────────────────────────────────
+
+model MapFile {
+  id        String  @id @default(cuid())
+  clusterId String
+  name      String  // имя файла без расширения, попадёт в /etc/haproxy/maps/<name>.map
+  description String?
+  // [{ key, value }]; рендерится по строке на пару
+  entries   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cluster Cluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+
+  @@unique([clusterId, name])
+}
+
+model AclListFile {
+  id        String  @id @default(cuid())
+  clusterId String
+  name      String  // /etc/haproxy/acl/<name>.lst
+  description String?
+  // массив строк (IP, CIDR, паттерны)
+  entries   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cluster Cluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+
+  @@unique([clusterId, name])
+}
+
+model ErrorFile {
+  id        String  @id @default(cuid())
+  clusterId String
+  name      String  // /etc/haproxy/errors/<name>.http
+  status    Int     // 400, 403, 429, 503, ...
+  // тело HTTP-ответа (status line + headers + body, как требует HAProxy errorfile формат)
+  content   String  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cluster Cluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+
+  @@unique([clusterId, name])
+}
+
+model LuaScript {
+  id          String   @id @default(cuid())
+  clusterId   String
+  name        String   // /etc/haproxy/lua/<name>.lua
+  description String?
+  source      String   @db.Text
+  // как загружать: lua-load (per-thread) | lua-load-per-thread
+  loadMode    String   @default("lua-load")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  cluster Cluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+
+  @@unique([clusterId, name])
+}
+
+model SpoeAgent {
+  id        String  @id @default(cuid())
+  clusterId String
+  name      String  // /etc/haproxy/spoe/<name>.cfg
+  // конфиг SPOE как набор полей (engine, agent, messages, groups)
+  config    Json
+  rawExtra  String? @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cluster Cluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+
+  @@unique([clusterId, name])
+}
+
+// ─── Certificates / ACME / DNS providers ─────────────────────────────────
+
+enum CertificateSource {
+  UPLOAD
+  ACME
+}
+
+enum AcmeChallenge {
+  HTTP_01
+  DNS_01
+}
+
+enum AcmeOrderStatus {
+  PENDING
+  PROCESSING
+  READY
+  VALID
+  FAILED
+}
+
+enum DnsProviderKind {
+  CLOUDFLARE
+  ROUTE53
+  DIGITALOCEAN
+  HETZNER
+  YANDEX
+  CUSTOM
+}
+
+model Certificate {
+  id                String            @id @default(cuid())
+  orgId             String
+  commonName        String
+  sans              String[]
+  issuer            String
+  notBefore         DateTime
+  notAfter          DateTime
+  fingerprintSha256 String
+  source            CertificateSource
+  encryptedPemBlob  Bytes
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  acmeOrders AcmeOrder[]
+  binds      Bind[]
+  proxyHosts ProxyHost[]
+
+  @@index([orgId, notAfter])
+}
+
+model AcmeAccount {
+  id           String   @id @default(cuid())
+  orgId        String
+  provider     String
+  email        String
+  directoryUrl String
+  kid          String?
+  encryptedKey Bytes
+  createdAt    DateTime @default(now())
+
+  orders AcmeOrder[]
+}
+
+model DnsProvider {
+  id                   String          @id @default(cuid())
+  orgId                String
+  kind                 DnsProviderKind
+  name                 String
+  encryptedCredentials Bytes
+  zonesCache           Json?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  orders AcmeOrder[]
+
+  @@unique([orgId, name])
+}
+
+model AcmeOrder {
+  id            String          @id @default(cuid())
+  orgId         String
+  accountId     String
+  domains       String[]
+  wildcard      Boolean         @default(false)
+  challenge     AcmeChallenge
+  dnsProviderId String?
+  certificateId String?
+  status        AcmeOrderStatus @default(PENDING)
+  errorMessage  String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  account     AcmeAccount  @relation(fields: [accountId],     references: [id], onDelete: Cascade)
+  dnsProvider DnsProvider? @relation(fields: [dnsProviderId], references: [id])
+  certificate Certificate? @relation(fields: [certificateId], references: [id])
+
+  @@index([orgId, status])
+}
+
+// ─── Proxy Hosts (NPM-style host routing) ───────────────────────────────
+
+enum ForwardScheme {
+  http
+  https
+  tcp
+  udp
+}
+
+enum HealthStatus {
+  UNKNOWN
+  HEALTHY
+  UNHEALTHY
+  DEGRADED
+}
+
+/// Группа доступа: whitelist по IP (CIDR) и/или Basic Auth. Привязывается к ProxyHost.
+/// Пустой ipAllowlist и пустой authUsers недопустимы при сохранении (валидация в API).
+model AccessGroup {
+  id          String   @id @default(cuid())
+  clusterId   String
+  name        String
+  /// Список IPv4/IPv6 или CIDR (строки как в HAProxy `src`).
+  ipAllowlist Json     @default("[]")
+  /// [{ "username": string, "passwordEnc": base64 envelope }]
+  authUsers   Json     @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  cluster                Cluster                 @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+  proxyHostMemberships   ProxyHostAccessGroup[]
+
+  @@unique([clusterId, name])
+}
+
+/// Связь ProxyHost ↔ AccessGroup (несколько групп на один хост).
+model ProxyHostAccessGroup {
+  proxyHostId   String
+  accessGroupId String
+
+  proxyHost   ProxyHost   @relation(fields: [proxyHostId], references: [id], onDelete: Cascade)
+  accessGroup AccessGroup @relation(fields: [accessGroupId], references: [id], onDelete: Cascade)
+
+  @@id([proxyHostId, accessGroupId])
+  @@index([accessGroupId])
+}
+
+/// Простая сущность в духе Nginx Proxy Manager: один subdomain → один upstream.
+/// Renderer haproxy.cfg раскладывает это в shared frontend на :80/:443 + ACL
+/// по `req.hdr(host)` → use_backend per host.
+model ProxyHost {
+  id            String        @id @default(cuid())
+  clusterId     String
+  domain        String        // app.example.com / *.example.com
+  forwardScheme ForwardScheme @default(http)
+  forwardHost   String        // IP или hostname upstream'а
+  forwardPort   Int           @default(80)
+  /** Для tcp/udp: на каком порту HAProxy слушает входящий трафик. */
+  listenPort    Int?
+  /** Кастомные request-заголовки, добавляемые HAProxy при проксировании на upstream.
+   *  Структура: { name: value }; имена нормализуются в lower-case при сохранении. */
+  customHeaders Json?
+  ssl           Boolean       @default(true)  // терминация TLS на :443
+  certificateId String?
+  httpToHttps   Boolean       @default(true)  // 80 → 301 → 443
+  hsts          Boolean       @default(false)
+  blockExploits Boolean       @default(true)  // базовые WAF-правила
+  wsSupport     Boolean       @default(true)  // Upgrade/Connection: keep-alive
+  http2         Boolean       @default(true)  // alpn h2,http/1.1 (TLS only)
+  http3         Boolean       @default(false) // QUIC + bind quic4@*:443
+  enabled       Boolean       @default(true)
+  notes         String?
+
+  // Healthcheck (probing upstream) — обновляется фоновой scheduled-задачей
+  healthStatus    HealthStatus @default(UNKNOWN)
+  healthCheckedAt DateTime?
+  healthHttpCode  Int?
+  healthLatencyMs Int?
+  healthError     String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  cluster                  Cluster                  @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+  certificate              Certificate?             @relation(fields: [certificateId], references: [id])
+  accessGroupMemberships   ProxyHostAccessGroup[]
+
+  @@unique([clusterId, domain])
+  @@index([certificateId])
+}
+
+// ─── Audit ───────────────────────────────────────────────────────────────
+
+model AuditEvent {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  targetType String
+  targetId   String?
+  payload    Json?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation("ActorAudit", fields: [actorId], references: [id])
+
+  @@index([action, createdAt])
+  @@index([targetType, targetId])
+}

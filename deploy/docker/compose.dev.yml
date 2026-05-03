@@ -1,0 +1,31 @@
+# Override для разработки: hot-reload api/web, монтирование исходников.
+# Использование:
+#   docker compose -f deploy/docker/compose.yml -f deploy/docker/compose.dev.yml --env-file deploy/docker/.env up
+
+services:
+  api:
+    image: node:20-alpine
+    working_dir: /repo/apps/api
+    command: ["sh", "-lc", "corepack enable && pnpm install && pnpm prisma:generate && pnpm dev"]
+    volumes:
+      - ../..:/repo
+      - api_node_modules:/repo/node_modules
+    environment:
+      NODE_ENV: development
+      VITE_API_URL: http://api:3000
+
+  web:
+    image: node:20-alpine
+    working_dir: /repo/apps/web
+    command: ["sh", "-lc", "corepack enable && pnpm install && pnpm dev --host 0.0.0.0"]
+    volumes:
+      - ../..:/repo
+      - web_node_modules:/repo/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://api:3000
+
+volumes:
+  api_node_modules: {}
+  web_node_modules: {}
