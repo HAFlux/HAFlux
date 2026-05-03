@@ -169,16 +169,55 @@ write_secrets() {
 }
 
 # ─── haproxy bootstrap config ────────────────────────────────────────
+# Генерируем self-signed cert один раз. Панель потом заменит на нормальные
+# Let's Encrypt сертификаты при добавлении proxy host'ов с ACME.
+write_self_signed_cert() {
+  local cert_dir="$INSTALL_DIR/haproxy-data/certs"
+  local cert="$cert_dir/_default.pem"
+  [[ -f "$cert" ]] && return
+  local pub_host
+  pub_host="$(detect_public_host)"
+  log "Генерирую self-signed cert для :443 (CN=${pub_host})..."
+  local tmp_dir
+  tmp_dir="$(mktemp -d)"
+  ( umask 077
+    openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+      -subj "/CN=${pub_host}" \
+      -addext "subjectAltName=DNS:${pub_host},IP:${pub_host}" \
+      -keyout "${tmp_dir}/key.pem" \
+      -out "${tmp_dir}/cert.pem" \
+      >/dev/null 2>&1 || \
+    openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+      -subj "/CN=${pub_host}" \
+      -keyout "${tmp_dir}/key.pem" \
+      -out "${tmp_dir}/cert.pem" \
+      >/dev/null 2>&1
+    cat "${tmp_dir}/cert.pem" "${tmp_dir}/key.pem" > "$cert"
+    chmod 0600 "$cert"
+  )
+  rm -rf "$tmp_dir"
+}
+
 write_bootstrap_cfg() {
   local cfg="$INSTALL_DIR/haproxy-data/haproxy.cfg"
   [[ -f "$cfg" ]] && return
+  # Доп. bind на WEB_PORT, если он отличается от 80 и 443 (haproxy не
+  # допускает дублирующих bind на одном порту). Так панель доступна и по
+  # чистому http://host/, и по https://host/, и опционально по
+  # http://host:WEB_PORT/.
+  local extra_bind=""
+  if [[ "$WEB_PORT" != "80" && "$WEB_PORT" != "443" ]]; then
+    extra_bind=$'\n  bind *:'"${WEB_PORT}"
+  fi
   cat > "$cfg" <<HAPROXY
 # Bootstrap haproxy.cfg — будет перезаписан HAFlux панелью при первом
-# Apply. До этого момента HAProxy слушает haflux_web_port и проксирует и
-# REST (/api/*), и SPA на api контейнер (он сам отдаёт статику).
+# Apply. До этого момента HAProxy слушает :80, :443 (с self-signed
+# сертом) и опционально :${WEB_PORT}, и проксирует и REST (/api/*), и
+# SPA на api контейнер (он сам отдаёт статику).
 global
   maxconn 4000
   log stdout local0 info
+  ssl-default-bind-options ssl-min-ver TLSv1.2 no-tls-tickets
 
 defaults
   mode http
@@ -190,7 +229,8 @@ defaults
   timeout server  60s
 
 frontend fe_panel
-  bind *:${WEB_PORT}
+  bind *:80
+  bind *:443 ssl crt /etc/haproxy/certs/_default.pem alpn h2,http/1.1${extra_bind}
   default_backend be_panel
 
 backend be_panel
@@ -377,7 +417,7 @@ MSG
 wait_healthy() {
   local i
   for ((i = 0; i < 60; i++)); do
-    if curl -fsS -m 3 "http://127.0.0.1:${WEB_PORT}/health" >/dev/null 2>&1; then
+    if curl -fsS -m 3 "http://127.0.0.1/health" >/dev/null 2>&1; then
       return 0
     fi
     sleep 2
@@ -431,14 +471,14 @@ cmd_info() {
     rootpw="(файл ${INSTALL_DIR}/.secrets/root_password недоступен — запусти из-под root)"
   fi
   email="$(grep -E "^BOOTSTRAP_ROOT_EMAIL=" "${INSTALL_DIR}/.env" 2>/dev/null | cut -d= -f2- || echo "admin@haflux.local")"
-  port="$(grep -E "^WEB_PORT=" "${INSTALL_DIR}/.env" 2>/dev/null | cut -d= -f2- || echo "8080")"
 
   echo
   echo "$(bold)──────────────────────────────────────────────────────────$(norm)"
   echo "$(bold)HAFlux access$(norm)"
   echo "$(bold)──────────────────────────────────────────────────────────$(norm)"
   echo
-  echo "  URL:      $(bold)http://${pub_host}:${port}$(norm)"
+  echo "  URL:      $(bold)http://${pub_host}$(norm)"
+  echo "            $(bold)https://${pub_host}$(norm)  (self-signed)"
   echo "  Email:    $(bold)${email}$(norm)"
   echo "  Password: $(bold)${rootpw}$(norm)"
   echo
@@ -466,20 +506,23 @@ CLI
 }
 
 print_banner() {
-  local pub_host rootpw bold='' norm=''
+  local pub_host rootpw bold='' norm='' url
   pub_host="$(detect_public_host)"
   rootpw="$(cat "$INSTALL_DIR/.secrets/root_password")"
   if [[ -t 1 ]]; then
     bold="$(tput bold 2>/dev/null || true)"
     norm="$(tput sgr0 2>/dev/null || true)"
   fi
+  # Bootstrap haproxy.cfg слушает и :80, и :443 (self-signed), поэтому
+  # clean URL без порта работает на обоих схемах.
   cat <<BANNER
 
 ${bold}══════════════════════════════════════════════════════════${norm}
 ${bold}                  HAFlux control-plane is up${norm}
 ${bold}══════════════════════════════════════════════════════════${norm}
 
-  ${bold}URL${norm}:      ${bold}http://${pub_host}:${WEB_PORT}${norm}
+  ${bold}URL${norm}:      ${bold}http://${pub_host}${norm}
+            ${bold}https://${pub_host}${norm}  (self-signed, до выпуска LE)
   ${bold}Email${norm}:    ${bold}${ROOT_EMAIL}${norm}
   ${bold}Password${norm}: ${bold}${rootpw}${norm}
 
@@ -506,6 +549,7 @@ main() {
   tune_sysctl
   ensure_dirs
   write_secrets
+  write_self_signed_cert
   write_bootstrap_cfg
   write_env
   write_compose
