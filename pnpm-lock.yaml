@@ -20,7 +20,7 @@ importers:
       '@fastify/static':
         specifier: 8.0.4
         version: 8.0.4
-      '@hapilot/contracts':
+      '@haflux/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
       '@nestjs/common':
@@ -123,7 +123,7 @@ importers:
       '@fontsource-variable/geist-mono':
         specifier: ^5.1.1
         version: 5.2.7
-      '@hapilot/contracts':
+      '@haflux/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
       '@heroui/react':
@@ -133,8 +133,8 @@ importers:
         specifier: 3.0.3
         version: 3.0.3(tailwind-merge@3.4.0)(tailwindcss@4.1.11)
       '@tanstack/react-query':
-        specifier: 5.62.11
-        version: 5.62.11(react@19.2.5)
+        specifier: 5.100.8
+        version: 5.100.8(react@19.2.5)
       clsx:
         specifier: 2.1.1
         version: 2.1.1
@@ -209,6 +209,9 @@ importers:
       typescript:
         specifier: 5.7.2
         version: 5.7.2
+      vitest:
+        specifier: 2.1.8
+        version: 2.1.8(@types/node@22.10.5)(lightningcss@1.30.1)(terser@5.46.2)
 
 packages:
 
@@ -1616,11 +1619,11 @@ packages:
     peerDependencies:
       vite: ^5.2.0 || ^6 || ^7
 
-  '@tanstack/query-core@5.62.9':
-    resolution: {integrity: sha512-lwePd8hNYhyQ4nM/iRQ+Wz2cDtspGeZZHFZmCzHJ7mfKXt+9S301fULiY2IR2byJYY6Z03T427E5PoVfMexHjw==}
+  '@tanstack/query-core@5.100.8':
+    resolution: {integrity: sha512-ceYwSFOqjPwET5TA6IOYxzxlGc0ekyH/gfOtWkP0PX43rzX9bxW48Iuw8KAduKCToi4rJAQ6nRy2kAe8gszdmg==}
 
-  '@tanstack/react-query@5.62.11':
-    resolution: {integrity: sha512-Xb1nw0cYMdtFmwkvH9+y5yYFhXvLRCnXoqlzSw7UkqtCVFq3cG8q+rHZ2Yz1XrC+/ysUaTqbLKJqk95mCgC1oQ==}
+  '@tanstack/react-query@5.100.8':
+    resolution: {integrity: sha512-iNNEekixXU5vtAGKKZX2lx3jTooG5yNY+kv0wSgEdEYG0Mj0JM5bcuQtC35ZAP3nDopT6jciUK3xeX65U7AnfA==}
     peerDependencies:
       react: ^18 || ^19
 
@@ -2895,6 +2898,10 @@ packages:
   pluralize@8.0.0:
     resolution: {integrity: sha512-Nc3IT5yHzflTfbjgqWcCPpo7DaKy4FnpB0l/zCAW0Tc7jxAiuqSxHasntB3D7887LSrA93kDJ9IXovxJYxyLCA==}
     engines: {node: '>=4'}
+
+  postcss@8.5.13:
+    resolution: {integrity: sha512-qif0+jGGZoLWdHey3UFHHWP0H7Gbmsk8T5VEqyYFbWqPr1XqvLGBbk/sl8V5exGmcYJklJOhOQq1pV9IcsiFag==}
+    engines: {node: ^10 || ^12 || >=14}
 
   postcss@8.5.6:
     resolution: {integrity: sha512-3Ybi1tAuwAP9s0r1UQ2J4n5Y0G05bJkpUIO0/bI9MhwmD70S5aTWbXGBwxHrelT+XM1k6dM0pk+SwNkpTRN7Pg==}
@@ -4835,11 +4842,11 @@ snapshots:
       tailwindcss: 4.1.11
       vite: 6.0.11(@types/node@20.5.7)(jiti@2.6.1)(lightningcss@1.30.1)(terser@5.46.2)
 
-  '@tanstack/query-core@5.62.9': {}
+  '@tanstack/query-core@5.100.8': {}
 
-  '@tanstack/react-query@5.62.11(react@19.2.5)':
+  '@tanstack/react-query@5.100.8(react@19.2.5)':
     dependencies:
-      '@tanstack/query-core': 5.62.9
+      '@tanstack/query-core': 5.100.8
       react: 19.2.5
 
   '@types/babel__core@7.20.5':
@@ -6223,6 +6230,12 @@ snapshots:
 
   pluralize@8.0.0: {}
 
+  postcss@8.5.13:
+    dependencies:
+      nanoid: 3.3.12
+      picocolors: 1.1.1
+      source-map-js: 1.2.1
+
   postcss@8.5.6:
     dependencies:
       nanoid: 3.3.12
@@ -6681,7 +6694,7 @@ snapshots:
   vite@5.4.21(@types/node@20.5.7)(lightningcss@1.30.1)(terser@5.46.2):
     dependencies:
       esbuild: 0.21.5
-      postcss: 8.5.6
+      postcss: 8.5.13
       rollup: 4.60.2
     optionalDependencies:
       '@types/node': 20.5.7
@@ -6692,7 +6705,7 @@ snapshots:
   vite@5.4.21(@types/node@22.10.5)(lightningcss@1.30.1)(terser@5.46.2):
     dependencies:
       esbuild: 0.21.5
-      postcss: 8.5.6
+      postcss: 8.5.13
       rollup: 4.60.2
     optionalDependencies:
       '@types/node': 22.10.5
