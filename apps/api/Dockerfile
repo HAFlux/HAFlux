@@ -1,5 +1,5 @@
 ## ─── Builder ─────────────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:25-alpine AS builder
 WORKDIR /repo
 
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
@@ -26,7 +26,7 @@ RUN pnpm --filter @haflux/contracts build \
  && pnpm --filter @haflux/api deploy --prod /out
 
 ## ─── Runtime ─────────────────────────────────────────────────────────────
-FROM node:20-alpine AS runtime
+FROM node:25-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
