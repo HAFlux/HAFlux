@@ -38,7 +38,7 @@ echo "Generating secrets in ${ENV_FILE}:"
 set_if_default DB_PASSWORD            "$(gen_b64 | tr -d '/+=' | head -c 24)"
 set_if_default JWT_SECRET             "$(gen_b64)"
 set_if_default ENCRYPTION_KEY         "$(gen_b64)"
-set_if_default HAPILOT_AGENT_TOKEN    "$(gen_b64)"
+set_if_default HAFLUX_AGENT_TOKEN    "$(gen_b64)"
 
 # чистим .env.bak от sed на macOS
 rm -f "${ENV_FILE}.bak"

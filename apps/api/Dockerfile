@@ -19,11 +19,11 @@ COPY apps/api ./apps/api
 COPY apps/web ./apps/web
 
 # Build: contracts → web (Vite SPA) → prisma generate → api (Nest)
-RUN pnpm --filter @hapilot/contracts build \
- && pnpm --filter @hapilot/web build \
- && pnpm --filter @hapilot/api exec prisma generate \
- && pnpm --filter @hapilot/api build \
- && pnpm --filter @hapilot/api deploy --prod /out
+RUN pnpm --filter @haflux/contracts build \
+ && pnpm --filter @haflux/web build \
+ && pnpm --filter @haflux/api exec prisma generate \
+ && pnpm --filter @haflux/api build \
+ && pnpm --filter @haflux/api deploy --prod /out
 
 ## ─── Runtime ─────────────────────────────────────────────────────────────
 FROM node:20-alpine AS runtime

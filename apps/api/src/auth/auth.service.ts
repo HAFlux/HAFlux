@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as argon2 from 'argon2';
 import { randomBytes } from 'node:crypto';
-import type { LoginRequest, LoginResponse } from '@hapilot/contracts';
+import type { LoginRequest, LoginResponse } from '@haflux/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppException, ErrorCode } from '../common/errors';
 

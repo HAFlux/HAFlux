@@ -35,7 +35,7 @@ services:
     build:
       context: ../..
       dockerfile: apps/api/Dockerfile
-    image: hapilot/api:dev
+    image: haflux/api:dev
     restart: unless-stopped
     environment:
       NODE_ENV: production

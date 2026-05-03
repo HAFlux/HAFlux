@@ -60,7 +60,7 @@ async function bootstrap() {
   await app.listen({ port, host: '0.0.0.0' });
 
   const logger = new Logger('Bootstrap');
-  logger.log(`HAPilot API listening on http://0.0.0.0:${port}`);
+  logger.log(`HAFlux API listening on http://0.0.0.0:${port}`);
   if (existsSync(staticDir)) {
     logger.log(`Serving SPA from ${staticDir}`);
   }

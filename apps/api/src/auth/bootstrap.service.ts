@@ -32,7 +32,7 @@ export class BootstrapService implements OnModuleInit {
   }
 
   private async bootstrap(): Promise<void> {
-    const email = (this.cfg.get<string>('BOOTSTRAP_ROOT_EMAIL') ?? 'admin@hapilot.local').toLowerCase();
+    const email = (this.cfg.get<string>('BOOTSTRAP_ROOT_EMAIL') ?? 'admin@haflux.local').toLowerCase();
 
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -72,7 +72,7 @@ export class BootstrapService implements OnModuleInit {
     });
 
     this.logger.log('────────────────────────────────────────────────');
-    this.logger.log(' HAPilot bootstrap');
+    this.logger.log(' HAFlux bootstrap');
     this.logger.log(`   email:    ${user.email}`);
     if (!this.cfg.get<string>('BOOTSTRAP_ROOT_PASSWORD')) {
       this.logger.log(`   password: ${password}   (generated, save it now)`);

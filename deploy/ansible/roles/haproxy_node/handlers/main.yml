@@ -1,11 +1,11 @@
 ---
 - name: reload haproxy
   community.docker.docker_container_exec:
-    container: "{{ hapilot_haproxy_container_name }}"
+    container: "{{ haflux_haproxy_container_name }}"
     command: "haproxy -c -f /usr/local/etc/haproxy/haproxy.cfg -f /usr/local/etc/haproxy/conf.d/"
 
 - name: restart haproxy container
   community.docker.docker_container:
-    name: "{{ hapilot_haproxy_container_name }}"
+    name: "{{ haflux_haproxy_container_name }}"
     state: started
     restart: true

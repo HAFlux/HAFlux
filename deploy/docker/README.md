@@ -34,5 +34,5 @@ Vite слушает 5173, API — 3000.
 
 1. Control-plane (api/web/db/redis) — на отдельной машине.
 2. На каждой ноде HAProxy — отдельный compose только с сервисами `haproxy` и `agent`,
-   `HAPILOT_API_URL` указывает на control-plane.
+   `HAFLUX_API_URL` указывает на control-plane.
 3. Токен агента создаётся в UI (Settings → Nodes → Add node).

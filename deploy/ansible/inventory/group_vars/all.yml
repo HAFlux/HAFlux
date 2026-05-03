@@ -1,47 +1,47 @@
 ---
 # ─── Общие переменные ────────────────────────────────────────────────────
 
-hapilot_repo_url: "https://github.com/haproxy-panel/waf.git"
-hapilot_repo_ref: "main"
-hapilot_install_dir: "/opt/hapilot"
+haflux_repo_url: "https://github.com/haflux/haflux.git"
+haflux_repo_ref: "main"
+haflux_install_dir: "/opt/haflux"
 
 # Куда складывать сгенерированные секреты на control-plane (root:root, 0600).
-hapilot_secrets_dir: "{{ hapilot_install_dir }}/.secrets"
+haflux_secrets_dir: "{{ haflux_install_dir }}/.secrets"
 
 # URL control-plane, как его видят HAProxy ноды.
-hapilot_control_plane_host: "{{ groups['control_plane'][0] }}"
-hapilot_control_plane_port: 3000
-hapilot_control_plane_url: "http://{{ hapilot_control_plane_host }}:{{ hapilot_control_plane_port }}"
+haflux_control_plane_host: "{{ groups['control_plane'][0] }}"
+haflux_control_plane_port: 3000
+haflux_control_plane_url: "http://{{ haflux_control_plane_host }}:{{ haflux_control_plane_port }}"
 
 # Версии
-hapilot_haproxy_image: "haproxy:3.1.17-alpine"
-hapilot_postgres_version: "16-alpine"
-hapilot_redis_version: "7-alpine"
+haflux_haproxy_image: "haproxy:3.1.17-alpine"
+haflux_postgres_version: "16-alpine"
+haflux_redis_version: "7-alpine"
 
 # Директория с haproxy.cfg + модулями (и на control-plane, и на нодах)
-hapilot_haproxy_data_dir: "/etc/haproxy"
-hapilot_haproxy_container_name: "haproxy-balancer"
+haflux_haproxy_data_dir: "/etc/haproxy"
+haflux_haproxy_container_name: "haproxy-balancer"
 
 # Bootstrap root-пользователя
-hapilot_root_email: "admin@hapilot.local"
+haflux_root_email: "admin@haflux.local"
 
 # Открывать ли в UFW порты 80/443 на нодах
-hapilot_open_http_ports: true
+haflux_open_http_ports: true
 
 # Способ деплоя:
 #   build  — клонируем репо и собираем образы локально (по умолчанию пока нет registry)
-#   pull   — берём образы из registry (см. hapilot_image_*)
-hapilot_image_source: "build"
-hapilot_image_registry: "ghcr.io/haproxy-panel"
-hapilot_image_tag: "main"
+#   pull   — берём образы из registry (см. haflux_image_*)
+haflux_image_source: "build"
+haflux_image_registry: "ghcr.io/haflux"
+haflux_image_tag: "main"
 
 # Порты UI и API на control-plane
-hapilot_web_port: 8080
-hapilot_api_port: 3000
+haflux_web_port: 8080
+haflux_api_port: 3000
 
 # ─── SSH-доступ панели к нодам ───────────────────────────────────────────
 # Публичный ключ панели (ed25519). Будет уложен в authorized_keys на нодах.
 # Сгенерируйте на control-plane (после первого `up`) — Settings → SSH key.
 # Или сгенерируйте локально и передайте через --extra-vars.
-hapilot_panel_pubkey: ""    # ssh-ed25519 AAAA... hapilot
-hapilot_node_user: "hapilot"
+haflux_panel_pubkey: ""    # ssh-ed25519 AAAA... haflux
+haflux_node_user: "haflux"

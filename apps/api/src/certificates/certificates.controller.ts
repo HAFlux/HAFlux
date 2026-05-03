@@ -12,7 +12,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { z } from 'zod';
-import { CloudflareCredentialsSchema } from '@hapilot/contracts';
+import { CloudflareCredentialsSchema } from '@haflux/contracts';
 import { CloudflareDnsProvider } from './cloudflare.provider';
 import { CertificatesService } from './certificates.service';
 import { CertificateRenewService } from './renew.service';

@@ -164,7 +164,7 @@ model Node {
 /// Публичная часть кладётся в authorized_keys на нодах через Ansible.
 model SshKey {
   id              String   @id @default(cuid())
-  comment         String   @default("hapilot")
+  comment         String   @default("haflux")
   publicKey       String
   encryptedPrivKey Bytes
   createdAt       DateTime @default(now())

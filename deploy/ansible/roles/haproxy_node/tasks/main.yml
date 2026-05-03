@@ -4,9 +4,9 @@
 # Никакого custom-агента сверху — панель управляет нодой исключительно через
 # SSH (SFTP файлы + ssh-exec команд).
 
-- name: Ensure unprivileged user for HAPilot panel SSH access
+- name: Ensure unprivileged user for HAFlux panel SSH access
   ansible.builtin.user:
-    name: "{{ hapilot_node_user }}"
+    name: "{{ haflux_node_user }}"
     shell: /bin/bash
     create_home: true
     groups: docker
@@ -15,36 +15,36 @@
 
 - name: Ensure ~/.ssh exists
   ansible.builtin.file:
-    path: "/home/{{ hapilot_node_user }}/.ssh"
+    path: "/home/{{ haflux_node_user }}/.ssh"
     state: directory
-    owner: "{{ hapilot_node_user }}"
-    group: "{{ hapilot_node_user }}"
+    owner: "{{ haflux_node_user }}"
+    group: "{{ haflux_node_user }}"
     mode: "0700"
 
-- name: Authorize HAPilot panel public key
+- name: Authorize HAFlux panel public key
   ansible.posix.authorized_key:
-    user: "{{ hapilot_node_user }}"
-    key: "{{ hapilot_panel_pubkey }}"
+    user: "{{ haflux_node_user }}"
+    key: "{{ haflux_panel_pubkey }}"
     state: present
-  when: hapilot_panel_pubkey | length > 0
+  when: haflux_panel_pubkey | length > 0
 
 - name: Warn if no panel pubkey provided
   ansible.builtin.debug:
     msg: >-
-      hapilot_panel_pubkey is empty — node will be unreachable from the panel
+      haflux_panel_pubkey is empty — node will be unreachable from the panel
       until you append the panel SSH public key into
-      /home/{{ hapilot_node_user }}/.ssh/authorized_keys.
-  when: hapilot_panel_pubkey | length == 0
+      /home/{{ haflux_node_user }}/.ssh/authorized_keys.
+  when: haflux_panel_pubkey | length == 0
 
 - name: Ensure haproxy data directories exist
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
-    owner: "{{ hapilot_node_user }}"
-    group: "{{ hapilot_node_user }}"
+    owner: "{{ haflux_node_user }}"
+    group: "{{ haflux_node_user }}"
     mode: "0755"
   loop:
-    - "{{ hapilot_haproxy_data_dir }}"
+    - "{{ haflux_haproxy_data_dir }}"
     - "{{ haproxy_node_confd_path }}"
     - "{{ haproxy_node_certs_path }}"
     - "{{ haproxy_node_maps_path }}"
@@ -56,12 +56,12 @@
 - name: Place bootstrap haproxy.cfg (минимальный — будет перезаписан панелью)
   ansible.builtin.copy:
     dest: "{{ haproxy_node_main_cfg_path }}"
-    owner: "{{ hapilot_node_user }}"
-    group: "{{ hapilot_node_user }}"
+    owner: "{{ haflux_node_user }}"
+    group: "{{ haflux_node_user }}"
     mode: "0644"
     force: false
     content: |
-      # Bootstrap haproxy.cfg — будет полностью перезаписан HAPilot.
+      # Bootstrap haproxy.cfg — будет полностью перезаписан HAFlux.
       global
         maxconn 4000
         daemon
@@ -78,8 +78,8 @@
 
 - name: Run haproxy container
   community.docker.docker_container:
-    name: "{{ hapilot_haproxy_container_name }}"
-    image: "{{ hapilot_haproxy_image }}"
+    name: "{{ haflux_haproxy_container_name }}"
+    image: "{{ haflux_haproxy_image }}"
     state: started
     restart_policy: unless-stopped
     network_mode: host
@@ -110,7 +110,7 @@
     port: "{{ item }}"
     proto: tcp
   loop: ["80", "443"]
-  when: hapilot_open_http_ports and (hapilot_enable_ufw | default(false))
+  when: haflux_open_http_ports and (haflux_enable_ufw | default(false))
 
 - name: Print connection summary for the panel
   ansible.builtin.debug:
@@ -119,7 +119,7 @@
         transport      = SSH
         sshHost        = {{ inventory_hostname }}
         sshPort        = 22
-        sshUser        = {{ hapilot_node_user }}
-        haproxyDataDir = {{ hapilot_haproxy_data_dir }}
+        sshUser        = {{ haflux_node_user }}
+        haproxyDataDir = {{ haflux_haproxy_data_dir }}
         reloadMode     = CONTAINER
-        reloadTarget   = {{ hapilot_haproxy_container_name }}
+        reloadTarget   = {{ haflux_haproxy_container_name }}

@@ -1,9 +1,9 @@
 export type SiteConfig = typeof siteConfig;
 
 export const siteConfig = {
-  name: 'HPM',
-  fullName: 'HAProxy Packet Manager',
-  description: 'HAProxy Packet Manager — visual control plane for HAProxy.',
+  name: 'HAFlux',
+  fullName: 'HAFlux',
+  description: 'HAFlux — visual control plane for HAProxy.',
   navItems: [
     { label: 'Dashboard', href: '/dashboard' },
     { label: 'Proxy hosts', href: '/proxy-hosts' },

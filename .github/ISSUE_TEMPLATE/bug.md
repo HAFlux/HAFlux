@@ -17,7 +17,7 @@ labels: ['bug', 'triage']
 
 ## Окружение
 
-- HAPilot версия:
+- HAFlux версия:
 - Способ установки (docker compose / dev / другое):
 - Версия HAProxy на ноде:
 - ОС:

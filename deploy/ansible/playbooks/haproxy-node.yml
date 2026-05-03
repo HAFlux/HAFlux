@@ -6,5 +6,5 @@
     - common
     - sysctl_tuning
     - docker
-    - { role: xanmod, when: hapilot_install_xanmod | default(false) }
+    - { role: xanmod, when: haflux_install_xanmod | default(false) }
     - haproxy_node

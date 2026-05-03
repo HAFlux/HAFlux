@@ -1,13 +1,13 @@
 ---
 ## XanMod kernel — оптимизированный mainline-форк под нагрузку.
-## Ставится opt-in через `hapilot_install_xanmod=true` в inventory.
+## Ставится opt-in через `haflux_install_xanmod=true` в inventory.
 ##
 ## Источник: https://xanmod.org/ — apt-репозиторий пакетов linux-xanmod-*.
 ## Меняет ядро системы, требует reboot после установки.
 
 - name: Skip XanMod (not requested)
   ansible.builtin.meta: end_play
-  when: not (hapilot_install_xanmod | default(false))
+  when: not (haflux_install_xanmod | default(false))
 
 - name: Detect host CPU x86-64-v level (for proper XanMod variant)
   ansible.builtin.shell: |

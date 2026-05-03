@@ -1,15 +1,15 @@
 # Сгенерировано Ansible (роль control_plane). Не редактировать вручную.
-{% if hapilot_image_source == "build" %}
-{% set api_image = "hapilot/api:local" %}
-{% set web_image = "hapilot/web:local" %}
+{% if haflux_image_source == "build" %}
+{% set api_image = "haflux/api:local" %}
+{% set web_image = "haflux/web:local" %}
 {% else %}
-{% set api_image = hapilot_image_registry ~ "/waf-api:" ~ hapilot_image_tag %}
-{% set web_image = hapilot_image_registry ~ "/waf-web:" ~ hapilot_image_tag %}
+{% set api_image = haflux_image_registry ~ "/waf-api:" ~ haflux_image_tag %}
+{% set web_image = haflux_image_registry ~ "/waf-web:" ~ haflux_image_tag %}
 {% endif %}
 
 services:
   db:
-    image: postgres:{{ hapilot_postgres_version }}
+    image: postgres:{{ haflux_postgres_version }}
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
@@ -25,7 +25,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:{{ hapilot_redis_version }}
+    image: redis:{{ haflux_redis_version }}
     restart: unless-stopped
     command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
     volumes:
@@ -33,9 +33,9 @@ services:
     networks: [internal]
 
   api:
-{% if hapilot_image_source == "build" %}
+{% if haflux_image_source == "build" %}
     build:
-      context: {{ hapilot_install_dir }}/src
+      context: {{ haflux_install_dir }}/src
       dockerfile: apps/api/Dockerfile
 {% endif %}
     image: {{ api_image }}
@@ -50,21 +50,21 @@ services:
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
       BOOTSTRAP_ROOT_EMAIL: ${BOOTSTRAP_ROOT_EMAIL}
       BOOTSTRAP_ROOT_PASSWORD: ${BOOTSTRAP_ROOT_PASSWORD}
-      HAPROXY_CONTAINER_NAME: {{ hapilot_haproxy_container_name }}
+      HAPROXY_CONTAINER_NAME: {{ haflux_haproxy_container_name }}
     volumes:
-      - {{ hapilot_haproxy_data_dir }}:/haproxy-data
+      - {{ haflux_haproxy_data_dir }}:/haproxy-data
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_started }
     networks: [internal, edge]
     ports:
-      - "{{ hapilot_api_port }}:3000"
+      - "{{ haflux_api_port }}:3000"
 
   web:
-{% if hapilot_image_source == "build" %}
+{% if haflux_image_source == "build" %}
     build:
-      context: {{ hapilot_install_dir }}/src
+      context: {{ haflux_install_dir }}/src
       dockerfile: apps/web/Dockerfile
 {% endif %}
     image: {{ web_image }}
@@ -72,22 +72,22 @@ services:
     depends_on: [api]
     networks: [edge]
     ports:
-      - "{{ hapilot_web_port }}:80"
+      - "{{ haflux_web_port }}:80"
 
   haproxy:
-    image: {{ hapilot_haproxy_image }}
-    container_name: {{ hapilot_haproxy_container_name }}
+    image: {{ haflux_haproxy_image }}
+    container_name: {{ haflux_haproxy_container_name }}
     network_mode: host
     user: "0:0"
     volumes:
-      - {{ hapilot_haproxy_data_dir }}/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
-      - {{ hapilot_haproxy_data_dir }}/conf.d:/usr/local/etc/haproxy/conf.d:ro
-      - {{ hapilot_haproxy_data_dir }}/certs:/etc/haproxy/certs:ro
-      - {{ hapilot_haproxy_data_dir }}/maps:/etc/haproxy/maps:ro
-      - {{ hapilot_haproxy_data_dir }}/acl:/etc/haproxy/acl:ro
-      - {{ hapilot_haproxy_data_dir }}/errors:/etc/haproxy/errors:ro
-      - {{ hapilot_haproxy_data_dir }}/lua:/etc/haproxy/lua:ro
-      - {{ hapilot_haproxy_data_dir }}/spoe:/etc/haproxy/spoe:ro
+      - {{ haflux_haproxy_data_dir }}/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - {{ haflux_haproxy_data_dir }}/conf.d:/usr/local/etc/haproxy/conf.d:ro
+      - {{ haflux_haproxy_data_dir }}/certs:/etc/haproxy/certs:ro
+      - {{ haflux_haproxy_data_dir }}/maps:/etc/haproxy/maps:ro
+      - {{ haflux_haproxy_data_dir }}/acl:/etc/haproxy/acl:ro
+      - {{ haflux_haproxy_data_dir }}/errors:/etc/haproxy/errors:ro
+      - {{ haflux_haproxy_data_dir }}/lua:/etc/haproxy/lua:ro
+      - {{ haflux_haproxy_data_dir }}/spoe:/etc/haproxy/spoe:ro
     command:
       - haproxy
       - -W

@@ -1,4 +1,4 @@
-# Contributing to HAPilot
+# Contributing to HAFlux
 
 Спасибо за интерес. Любая помощь приветствуется — багрепорты, PR, документация, переводы.
 
@@ -17,8 +17,8 @@ docker --version
 ```
 
 ```bash
-git clone https://github.com/hapilot/hapilot.git
-cd hapilot
+git clone https://github.com/haflux/haflux.git
+cd haflux
 pnpm install
 cp deploy/docker/env.example deploy/docker/.env
 ./deploy/docker/scripts/init-secrets.sh
@@ -44,7 +44,7 @@ docker compose -f deploy/docker/compose.yml -f deploy/docker/compose.dev.yml --e
 
 ## Issue templates
 
-При создании issue выберите подходящий шаблон в `.github/ISSUE_TEMPLATE`. Прикладывайте версии (HAProxy, HAPilot, OS) и шаги воспроизведения.
+При создании issue выберите подходящий шаблон в `.github/ISSUE_TEMPLATE`. Прикладывайте версии (HAProxy, HAFlux, OS) и шаги воспроизведения.
 
 ## Безопасность
 

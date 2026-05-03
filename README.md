@@ -1,4 +1,4 @@
-# HAPilot
+# HAFlux
 
 Multi‑HAProxy control plane: визуальное управление одной или несколькими инсталляциями HAProxy через Data Plane API.
 
@@ -17,8 +17,8 @@ Multi‑HAProxy control plane: визуальное управление одн�
 ## Быстрый старт (демо, одна нода)
 
 ```bash
-git clone https://github.com/hapilot/hapilot.git
-cd hapilot
+git clone https://github.com/haflux/haflux.git
+cd haflux
 cp deploy/docker/env.example deploy/docker/.env
 ./deploy/docker/scripts/init-secrets.sh   # сгенерирует JWT_SECRET, ENCRYPTION_KEY, DB_PASSWORD
 docker compose -f deploy/docker/compose.yml --env-file deploy/docker/.env up -d --build
@@ -29,7 +29,7 @@ UI откроется на `http://localhost:8080`. Дефолтный логи�
 ## Структура репозитория
 
 ```
-hapilot/
+haflux/
 ├── apps/
 │   ├── api/          # NestJS backend (модуль haproxy: render + transports)
 │   └── web/          # Vite + React UI

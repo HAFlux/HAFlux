@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 
-const TOKEN_KEY = 'hapilot:access-token';
+const TOKEN_KEY = 'haflux:access-token';
 
 type Listener = () => void;
 const listeners = new Set<Listener>();

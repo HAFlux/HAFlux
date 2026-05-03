@@ -39,7 +39,7 @@ export default function LoginPage() {
           <span style={{ color: 'var(--color-fg)' }}>
             <Logo size={26} />
           </span>
-          <span className="cyber-heading text-base">HAPilot</span>
+          <span className="cyber-heading text-base">HAFlux</span>
         </div>
         <ThemeSwitch />
       </header>
@@ -69,7 +69,7 @@ export default function LoginPage() {
                 <input
                   className="cyber-input"
                   autoComplete="email"
-                  placeholder="admin@hapilot.local"
+                  placeholder="admin@haflux.local"
                   required
                   type="email"
                   value={email}
@@ -108,7 +108,7 @@ export default function LoginPage() {
           </div>
 
           <div className="text-center">
-            <span className="cyber-label">[ HAPilot · v0.0.1 ]</span>
+            <span className="cyber-label">[ HAFlux · v0.0.1 ]</span>
           </div>
         </div>
       </div>

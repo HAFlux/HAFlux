@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { CloudflareCredentials } from '@hapilot/contracts';
+import type { CloudflareCredentials } from '@haflux/contracts';
 import { AppException, ErrorCode } from '../common/errors';
 
 interface CfTokenStatus {

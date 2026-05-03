@@ -1,8 +1,8 @@
 {
-  "name": "@hapilot/api",
+  "name": "@haflux/api",
   "version": "0.0.1",
   "private": true,
-  "description": "HAPilot backend (NestJS).",
+  "description": "HAFlux backend (NestJS).",
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",
@@ -26,7 +26,7 @@
     "@nestjs/terminus": "11.0.0",
     "@prisma/client": "6.1.0",
     "prisma": "6.1.0",
-    "@hapilot/contracts": "workspace:*",
+    "@haflux/contracts": "workspace:*",
     "acme-client": "5.4.0",
     "argon2": "0.41.1",
     "bullmq": "5.34.10",

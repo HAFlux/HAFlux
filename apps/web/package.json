@@ -1,5 +1,5 @@
 {
-  "name": "@hapilot/web",
+  "name": "@haflux/web",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
   "dependencies": {
     "@fontsource-variable/geist": "^5.1.1",
     "@fontsource-variable/geist-mono": "^5.1.1",
-    "@hapilot/contracts": "workspace:*",
+    "@haflux/contracts": "workspace:*",
     "@heroui/react": "3.0.3",
     "@heroui/styles": "3.0.3",
     "@tanstack/react-query": "5.62.11",

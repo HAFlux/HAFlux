@@ -1,4 +1,4 @@
-import type { ApiErrorBody, ErrorCode, LoginRequest, LoginResponse } from '@hapilot/contracts';
+import type { ApiErrorBody, ErrorCode, LoginRequest, LoginResponse } from '@haflux/contracts';
 import { setToken } from '@/lib/auth';
 
 const API_BASE = '/api/v1';
@@ -61,7 +61,7 @@ async function request<T>(
 
   if (init.auth) {
     const token =
-      typeof init.auth === 'string' ? init.auth : localStorage.getItem('hapilot:access-token');
+      typeof init.auth === 'string' ? init.auth : localStorage.getItem('haflux:access-token');
     if (token) headers.set('Authorization', `Bearer ${token}`);
   }
 
@@ -430,7 +430,7 @@ export const api = {
   },
   backup: {
     download: async (): Promise<{ blob: Blob; filename: string }> => {
-      const token = localStorage.getItem('hapilot:access-token');
+      const token = localStorage.getItem('haflux:access-token');
       const res = await fetch(`${API_BASE}/backup`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });

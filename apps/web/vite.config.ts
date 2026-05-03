@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [react(), tsconfigPaths(), tailwindcss()],
   resolve: {
     alias: {
-      '@hapilot/contracts': path.resolve(__dirname, '../../packages/contracts/src'),
+      '@haflux/contracts': path.resolve(__dirname, '../../packages/contracts/src'),
     },
   },
   server: {

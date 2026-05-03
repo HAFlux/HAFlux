@@ -20,7 +20,7 @@
 
 - name: Ensure target install directory exists
   ansible.builtin.file:
-    path: "{{ hapilot_install_dir }}"
+    path: "{{ haflux_install_dir }}"
     state: directory
     owner: root
     group: root
@@ -28,7 +28,7 @@
 
 - name: Ensure secrets directory exists
   ansible.builtin.file:
-    path: "{{ hapilot_secrets_dir }}"
+    path: "{{ haflux_secrets_dir }}"
     state: directory
     owner: root
     group: root
@@ -36,7 +36,7 @@
 
 - name: Set timezone (UTC by default)
   community.general.timezone:
-    name: "{{ hapilot_timezone | default('UTC') }}"
+    name: "{{ haflux_timezone | default('UTC') }}"
 
 # ─── Swap ──────────────────────────────────────────────────────────────
 # Контейнерная сборка api (pnpm install + tsc + nest build) требует ≥1.5GB.
@@ -49,13 +49,13 @@
 
 - name: Ensure swap file
   when:
-    - hapilot_ensure_swap | default(true)
+    - haflux_ensure_swap | default(true)
     - (_total_ram_mb | int) <= 2048
     - (_total_swap_mb | int) < 1024
   block:
     - name: Allocate /swapfile (2G)
       ansible.builtin.command:
-        cmd: "fallocate -l {{ hapilot_swap_size | default('2G') }} /swapfile"
+        cmd: "fallocate -l {{ haflux_swap_size | default('2G') }} /swapfile"
         creates: /swapfile
 
     - name: Permissions on /swapfile
@@ -99,4 +99,4 @@
         state: enabled
         policy: deny
         direction: incoming
-  when: hapilot_enable_ufw | default(false)
+  when: haflux_enable_ufw | default(false)

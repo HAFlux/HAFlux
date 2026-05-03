@@ -9,7 +9,7 @@
 **Не открывайте публичный issue** для уязвимостей.
 
 - GitHub Security Advisory: вкладка `Security → Report a vulnerability` репозитория.
-- E‑mail: `security@hapilot.dev` (PGP‑ключ — в репозитории, файл `.well-known/pgp.asc`, появится ближе к публичному релизу).
+- E‑mail: `security@haflux.dev` (PGP‑ключ — в репозитории, файл `.well-known/pgp.asc`, появится ближе к публичному релизу).
 
 В сообщении укажите:
 

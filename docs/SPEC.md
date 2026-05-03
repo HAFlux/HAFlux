@@ -1,4 +1,4 @@
-# ТЗ: Multi‑HAProxy Control Plane (рабочее имя — **HAPilot**)
+# ТЗ: Multi‑HAProxy Control Plane (рабочее имя — **HAFlux**)
 
 > Веб‑панель для централизованного управления одной или несколькими инсталляциями HAProxy.
 > Аналоги‑референсы: **Roxy‑WI**, **Nginx Proxy Manager (NPM)**, **BunkerWeb**.
@@ -91,7 +91,7 @@
 
 ## 4. Анализ аналогов
 
-| Возможность | NPM | BunkerWeb | Roxy‑WI | **HAPilot (наш)** |
+| Возможность | NPM | BunkerWeb | Roxy‑WI | **HAFlux (наш)** |
 |---|---|---|---|---|
 | Базовый UI для прокси | ✅ Tabler‑style | ✅ собственный | ✅ собственный | ✅ HeroUI |
 | TCP/UDP streams | ✅ | частично | ✅ | ✅ |
@@ -200,12 +200,12 @@
 > 3. Настройте права:
 >    - **Permissions**: `Zone — DNS — Edit`, `Zone — Zone — Read`.
 >    - **Zone Resources**: `Include — Specific zone — <ваш домен>` (рекомендуется ограничить именно нужной зоной; для нескольких зон добавьте каждую отдельной строкой или выберите `All zones from an account`).
->    - **Client IP Address Filtering**: пусто (или укажите публичный IP control‑plane HAPilot).
+>    - **Client IP Address Filtering**: пусто (или укажите публичный IP control‑plane HAFlux).
 >    - **TTL**: рекомендуется бессрочный, либо ≥ 1 год — иначе придётся обновлять токен и перевыпускать.
 > 4. Нажмите **Continue → Create Token**, скопируйте появившийся токен (он показывается ровно один раз).
-> 5. Вставьте токен в поле **API Token** в HAPilot и нажмите **Проверить**. Если зеленый чек — всё ок.
+> 5. Вставьте токен в поле **API Token** в HAFlux и нажмите **Проверить**. Если зеленый чек — всё ок.
 >
-> Минимально необходимые права: `Zone:DNS:Edit` + `Zone:Zone:Read`. Никакие другие скоупы (Account, Workers, R2 и т.д.) HAPilot не требует и не запрашивает.
+> Минимально необходимые права: `Zone:DNS:Edit` + `Zone:Zone:Read`. Никакие другие скоупы (Account, Workers, R2 и т.д.) HAFlux не требует и не запрашивает.
 
 **Проверки и валидация панелью:**
 
@@ -277,7 +277,7 @@
 - **Webhooks** на события (config changed, backend down, cert renewed).
 - **Service discovery**: HAProxy `server-template` + `resolvers` + DPAPI sync — UI для подключения к Consul, Nomad, etcd, Docker Swarm, Kubernetes (через `kube-proxy` watcher агента — v2).
 - **OIDC SSO** (Keycloak, Authentik, Authelia, GitLab, GitHub, Yandex ID).
-- **CLI** `hapilotctl` (Go, генерируется из OpenAPI) — экспорт/импорт, диффы, применение из CI.
+- **CLI** `hafluxctl` (Go, генерируется из OpenAPI) — экспорт/импорт, диффы, применение из CI.
 
 ---
 
@@ -309,7 +309,7 @@
 └──────────────────┬─────────────────────────────────────┬────────┘
                    │ HTTPS                              │ WSS
 ┌──────────────────▼─────────────────────────────────────▼────────┐
-│                    HAPilot Backend (NestJS)                     │
+│                    HAFlux Backend (NestJS)                     │
 │                                                                 │
 │  ┌──────────────── Haproxy module ──────────────────────────┐   │
 │  │ config-renderer  ·  validator (haproxy -c)               │   │
@@ -711,7 +711,7 @@ service AgentControl {
 ### 13.1 Структура репозитория
 
 ```
-hapilot/
+haflux/
 ├── apps/
 │   ├── web/         # Vite + React + HeroUI
 │   └── api/         # NestJS + Prisma + модуль haproxy
@@ -750,8 +750,8 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: hapilot
-      POSTGRES_USER: hapilot
+      POSTGRES_DB: haflux
+      POSTGRES_USER: haflux
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes: [db_data:/var/lib/postgresql/data]
     networks: [internal]
@@ -761,9 +761,9 @@ services:
     networks: [internal]
 
   api:
-    image: ghcr.io/hapilot/api:latest
+    image: ghcr.io/haflux/api:latest
     environment:
-      DATABASE_URL: postgres://hapilot:${DB_PASSWORD}@db:5432/hapilot
+      DATABASE_URL: postgres://haflux:${DB_PASSWORD}@db:5432/haflux
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
@@ -778,7 +778,7 @@ services:
     networks: [internal, frontend]
 
   web:
-    image: ghcr.io/hapilot/web:latest
+    image: ghcr.io/haflux/web:latest
     networks: [frontend]
 
   haproxy:
@@ -820,8 +820,8 @@ networks:
 ### 13.3 Простой запуск
 
 ```
-git clone https://github.com/hapilot/hapilot
-cd hapilot/deploy/docker
+git clone https://github.com/haflux/haflux
+cd haflux/deploy/docker
 cp env.example .env && ./scripts/init-secrets.sh
 docker compose up -d
 # открыть https://<host>, дефолт-логин выводится в логах api при первом старте
@@ -856,7 +856,7 @@ docker compose up -d
 - **SemVer** строго.
 - LTS‑ветки начиная с v1.
 - Подписи Cosign для Docker‑образов; SLSA level 3 как цель.
-- Демо‑инстанс (try.hapilot.dev) с reset раз в час.
+- Демо‑инстанс (try.haflux.dev) с reset раз в час.
 
 ### 14.4 Discoverability
 
@@ -909,7 +909,7 @@ docker compose up -d
 - Полный Advanced‑режим всех HAProxy‑сущностей, log‑format builder, errorfile editor.
 - Prometheus dashboards внутри панели.
 - mTLS frontends, CRL/OCSP.
-- CLI `hapilotctl`.
+- CLI `hafluxctl`.
 
 ### v2.0
 
@@ -964,5 +964,5 @@ docker compose up -d
 - [ ] DCO bot включён
 - [ ] Discussions включены, Discord/Matrix чат
 - [ ] docs/ полная архитектура и ADR ≥ 5 шт
-- [ ] try.hapilot.dev демо‑инстанс
+- [ ] try.haflux.dev демо‑инстанс
 - [ ] Renovate, Dependabot, CodeQL включены
