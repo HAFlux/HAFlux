@@ -36,9 +36,15 @@ curl -fsSL https://raw.githubusercontent.com/HAFlux/HAFlux/main/install.sh | sud
 2. Затюнится sysctl и nofile-лимиты под HAProxy.
 3. В `/opt/haflux/` развернётся: `compose.yml`, `.env`, директория `haproxy-data/`.
 4. Сгенерируются секреты (jwt, encryption, db_password, root_password) — идемпотентно, в `/opt/haflux/.secrets/` (mode 0600).
-5. Стянется `ghcr.io/haflux/api:latest`. Если pull не сработал (приватный пакет / нет релиза) — клонируется репо и api соберётся локально.
+5. Стянется готовый `ghcr.io/haflux/api:latest` (никакой компиляции на клиенте).
 6. Поднимется стек: `db` (postgres-16), `redis-7`, `api`, `haproxy:3.x`.
 7. В конце выведется баннер с URL/email/паролем — **сохрани их сразу**.
+
+> **Важно:** GHCR-пакеты от GitHub Actions по умолчанию приватные. После
+> первого релиза зайди в [Settings → Packages → api → Change visibility
+> → Public](https://github.com/users/HAFlux/packages/container/api/settings),
+> иначе `docker pull` упадёт. install.sh выведет понятную ошибку с этой
+> ссылкой и не будет пытаться билдить локально.
 
 После установки:
 
@@ -69,11 +75,10 @@ curl -fsSL https://raw.githubusercontent.com/HAFlux/HAFlux/main/install.sh \
 | `HAFLUX_WEB_PORT` | `8080` | порт HAProxy с панелью наружу |
 | `HAFLUX_API_PORT` | `3000` | порт api контейнера (на loopback) |
 | `HAFLUX_API_TAG` | `latest` | тег `ghcr.io/haflux/api` |
-| `HAFLUX_BUILD` | `0` | `1` — принудительная сборка из исходников |
+| `HAFLUX_API_IMAGE` | вычисляется из тега | полный image override (для приватного registry) |
 | `HAFLUX_PUBLIC_HOST` | первый IPv4 | адрес панели для CORS / баннера |
 | `HAFLUX_ROOT_EMAIL` | `admin@haflux.local` | email root-юзера |
 | `HAFLUX_ROOT_PASSWORD` | сгенерируется | задать корневой пароль явно |
-| `HAFLUX_REF` | `main` | ветка/тег для clone и raw-fetch |
 
 ## Альтернатива: docker compose руками
 

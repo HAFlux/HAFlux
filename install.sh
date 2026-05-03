@@ -9,21 +9,22 @@
 #   - Тюнит sysctl/nofile под HAProxy.
 #   - Готовит /opt/haflux: compose.yml + .env + haproxy-data/.
 #   - Генерирует секреты (jwt, encryption, db, root password) — идемпотентно.
-#   - Тянет ghcr.io/haflux/api:latest. Если pull недоступен (нет релиза /
-#     приватный пакет) — клонирует репо и собирает образ из исходников.
+#   - Тянет готовый образ ghcr.io/haflux/api:latest и поднимает стек.
 #   - Печатает URL + email + password один раз в конце.
+#
+# Никакой сборки на клиенте: весь api образ уже опубликован релизом в GHCR.
+# Если pull не сработал (например, пакет приватный) — install прерывается с
+# подсказкой, как сделать пакет публичным.
 #
 # Переменные окружения для override (необязательно):
 #   HAFLUX_INSTALL_DIR   default /opt/haflux
 #   HAFLUX_WEB_PORT      default 8080
 #   HAFLUX_API_PORT      default 3000
 #   HAFLUX_API_TAG       default latest          # тег ghcr.io/haflux/api
-#   HAFLUX_BUILD         default 0               # 1 = принудительная сборка из исходников
+#   HAFLUX_API_IMAGE     полный image override (для приватного registry)
 #   HAFLUX_PUBLIC_HOST   default <первый IPv4>
 #   HAFLUX_ROOT_EMAIL    default admin@haflux.local
 #   HAFLUX_ROOT_PASSWORD задаёт корневой пароль явно (вместо сгенерированного)
-#   HAFLUX_REPO          default https://github.com/HAFlux/HAFlux
-#   HAFLUX_REF           default main            # ветка/тег для clone и raw-fetch
 
 set -euo pipefail
 
@@ -31,11 +32,8 @@ INSTALL_DIR="${HAFLUX_INSTALL_DIR:-/opt/haflux}"
 WEB_PORT="${HAFLUX_WEB_PORT:-8080}"
 API_PORT="${HAFLUX_API_PORT:-3000}"
 API_TAG="${HAFLUX_API_TAG:-latest}"
-BUILD_FROM_SOURCE="${HAFLUX_BUILD:-0}"
+API_IMAGE="${HAFLUX_API_IMAGE:-ghcr.io/haflux/api:${API_TAG}}"
 ROOT_EMAIL="${HAFLUX_ROOT_EMAIL:-admin@haflux.local}"
-REPO="${HAFLUX_REPO:-https://github.com/HAFlux/HAFlux}"
-REF="${HAFLUX_REF:-main}"
-RAW_BASE="${REPO/github.com/raw.githubusercontent.com}/${REF}"
 
 log()  { echo "[haflux] $*"; }
 warn() { echo "[haflux] [warn] $*" >&2; }
@@ -251,13 +249,13 @@ ENV
   )
 }
 
-# Compose.yml для PULL-режима (без build-секции, чтобы compose не пытался
-# собрать из несуществующего контекста, если pull упал).
-write_pull_compose() {
+# Compose.yml — pull-only. Никакой build-секции: api тянется готовым
+# из ghcr.io релизом. Если хочется собрать локально — это путь
+# `git clone && docker compose -f deploy/docker/compose.yml ... up --build`,
+# но не через install.sh.
+write_compose() {
   cat > "$INSTALL_DIR/compose.yml" <<COMPOSE
-# Сгенерировано install.sh. Pull-режим: api тянется из ghcr.io.
-# Чтобы пересобрать локально из исходников — выставь HAFLUX_BUILD=1 и
-# перезапусти install.sh; тогда будет использоваться compose из клона.
+# Сгенерировано install.sh. Pull-only: api тянется готовым из ghcr.io.
 
 services:
   db:
@@ -286,11 +284,7 @@ services:
 
   api:
     image: \${HAFLUX_API_IMAGE:-ghcr.io/haflux/api:\${HAFLUX_API_TAG:-latest}}
-    # build-секция работает только если рядом распакован репозиторий в ./src.
-    # При pull-режиме compose использует image:; при --build  — собирает локально.
-    build:
-      context: ./src
-      dockerfile: apps/api/Dockerfile
+    pull_policy: missing
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -353,48 +347,31 @@ COMPOSE
 }
 
 # ─── deployment ──────────────────────────────────────────────────────
-try_pull() {
-  log "Пробую docker pull ghcr.io/haflux/api:${API_TAG}..."
-  if docker pull "ghcr.io/haflux/api:${API_TAG}" >/dev/null 2>&1; then
-    return 0
-  fi
-  return 1
-}
+deploy() {
+  log "Тяну ${API_IMAGE}..."
+  if ! docker pull "$API_IMAGE" 2>&1 | tee /tmp/haflux-pull.log >/dev/null; then
+    cat >&2 <<MSG
 
-deploy_pull_mode() {
-  log "Поднимаю стек (pull mode)..."
+[haflux] [error] Не удалось скачать ${API_IMAGE}.
+
+Возможные причины:
+  1. Релиз ещё не собрался — посмотри https://github.com/HAFlux/HAFlux/actions
+  2. Пакет в GHCR приватный по умолчанию. Сделай его публичным:
+       https://github.com/users/HAFlux/packages/container/api/settings
+       → Danger Zone → Change visibility → Public
+  3. Сетевая проблема. Подробности в /tmp/haflux-pull.log:
+
+$(tail -5 /tmp/haflux-pull.log 2>/dev/null | sed 's/^/    /')
+
+Override через HAFLUX_API_IMAGE (например свой private registry):
+  curl -fsSL https://raw.githubusercontent.com/HAFlux/HAFlux/main/install.sh \\
+    | sudo HAFLUX_API_IMAGE=registry.example.com/haflux/api:1.0 bash
+MSG
+    exit 1
+  fi
+  log "Поднимаю стек..."
   docker compose -f "$INSTALL_DIR/compose.yml" --env-file "$INSTALL_DIR/.env" \
     up -d --remove-orphans
-}
-
-deploy_build_mode() {
-  log "Pull недоступен (или HAFLUX_BUILD=1) — собираю api из исходников."
-  wait_for_apt
-  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git
-  if [[ ! -d "$INSTALL_DIR/src/.git" ]]; then
-    git clone --depth=1 --branch "$REF" "$REPO" "$INSTALL_DIR/src"
-  else
-    git -C "$INSTALL_DIR/src" fetch --depth=1 origin "$REF"
-    git -C "$INSTALL_DIR/src" checkout -B "$REF" "origin/$REF"
-  fi
-  # Используем тот же compose.yml — build:context указывает на ./src
-  # (относительно /opt/haflux/compose.yml).
-  log "docker compose up -d --build (это долго: pnpm install + Vite + Nest)..."
-  docker compose -f "$INSTALL_DIR/compose.yml" --env-file "$INSTALL_DIR/.env" \
-    up -d --build --remove-orphans
-}
-
-deploy() {
-  if [[ "$BUILD_FROM_SOURCE" == "1" ]]; then
-    deploy_build_mode
-    return
-  fi
-  if try_pull; then
-    deploy_pull_mode
-  else
-    warn "Не удалось скачать ghcr.io/haflux/api:${API_TAG}. Возможно, пакет приватный или ещё нет релиза."
-    deploy_build_mode
-  fi
 }
 
 wait_healthy() {
@@ -531,7 +508,7 @@ main() {
   write_secrets
   write_bootstrap_cfg
   write_env
-  write_pull_compose
+  write_compose
   install_cli
   deploy
   if ! wait_healthy; then
