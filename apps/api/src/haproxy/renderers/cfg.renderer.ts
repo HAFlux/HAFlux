@@ -522,7 +522,9 @@ function indent(s: string, n: number): string {
 
 function quoteIfNeeded(s: string): string {
   if (/^[A-Za-z0-9_./:%@,-]+$/.test(s)) return s;
-  return `"${s.replace(/"/g, '\\"')}"`;
+  // Backslash должен экранироваться ПЕРВЫМ, иначе входной `\"` после
+  // эскейпа кавычек превратится в `\\"` и получится незакрытый литерал.
+  return `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
 type ClusterWithIncludes = Prisma.ClusterGetPayload<{
