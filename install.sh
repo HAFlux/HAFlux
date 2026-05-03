@@ -51,8 +51,32 @@ require_apt() {
     || fail "Скрипт работает только на Debian/Ubuntu (apt-based). Для других дистрибутивов поднимай руками — см. deploy/docker/README.md"
 }
 
+# На cloud-образах сразу после загрузки фоном крутится unattended-upgrades,
+# держа /var/lib/dpkg/lock-frontend. Любой apt-get -y тогда падает с
+# `Could not get lock`. Ждём освобождения до 10 минут.
+wait_for_apt() {
+  local waited=0 max=600
+  while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 \
+     || fuser /var/lib/dpkg/lock          >/dev/null 2>&1 \
+     || fuser /var/lib/apt/lists/lock     >/dev/null 2>&1; do
+    if (( waited == 0 )); then
+      log "Ждём dpkg/apt lock (вероятно, unattended-upgrades после первого boot)..."
+    fi
+    sleep 5
+    waited=$((waited + 5))
+    if (( waited >= max )); then
+      fail "dpkg lock не освободился за ${max}s. Проверь: ps -ef | grep -E 'apt|dpkg|unattended'"
+    fi
+  done
+  if (( waited > 0 )); then
+    log "dpkg lock освободился через ${waited}s, продолжаю."
+  fi
+}
+
 ensure_basics() {
+  wait_for_apt
   apt-get update -qq
+  wait_for_apt
   DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     ca-certificates curl gnupg openssl
 }
@@ -74,7 +98,9 @@ install_docker() {
   cat > /etc/apt/sources.list.d/docker.list <<EOF
 deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/${distro} ${codename} stable
 EOF
+  wait_for_apt
   apt-get update -qq
+  wait_for_apt
   DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     docker-ce docker-ce-cli containerd.io \
     docker-buildx-plugin docker-compose-plugin
@@ -343,6 +369,7 @@ deploy_pull_mode() {
 
 deploy_build_mode() {
   log "Pull недоступен (или HAFLUX_BUILD=1) — собираю api из исходников."
+  wait_for_apt
   DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git
   if [[ ! -d "$INSTALL_DIR/src/.git" ]]; then
     git clone --depth=1 --branch "$REF" "$REPO" "$INSTALL_DIR/src"
