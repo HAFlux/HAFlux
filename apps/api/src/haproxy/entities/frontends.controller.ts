@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
-import { FrontendsService } from './frontends.service';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import type { FrontendsService } from './frontends.service';
 
 @ApiTags('haproxy:frontends')
 @ApiBearerAuth()

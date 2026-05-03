@@ -1,17 +1,17 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
-import LoginPage from '@/pages/login';
-import DashboardPage from '@/pages/dashboard';
-import ClustersPage from '@/pages/clusters';
-import CertificatesPage from '@/pages/certificates';
-import ErrorPagesPage from '@/pages/error-pages';
-import AccessGroupsPage from '@/pages/access-groups';
-import ProxyHostsPage from '@/pages/proxy-hosts';
-import HelpPage from '@/pages/help';
-import BackupPage from '@/pages/backup';
-import ProfilePage from '@/pages/profile';
 import DefaultLayout from '@/layouts/default';
 import { useAuth } from '@/lib/auth';
+import AccessGroupsPage from '@/pages/access-groups';
+import BackupPage from '@/pages/backup';
+import CertificatesPage from '@/pages/certificates';
+import ClustersPage from '@/pages/clusters';
+import DashboardPage from '@/pages/dashboard';
+import ErrorPagesPage from '@/pages/error-pages';
+import HelpPage from '@/pages/help';
+import LoginPage from '@/pages/login';
+import ProfilePage from '@/pages/profile';
+import ProxyHostsPage from '@/pages/proxy-hosts';
 
 function ProtectedShell() {
   const { token } = useAuth();

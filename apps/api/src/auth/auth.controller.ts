@@ -1,7 +1,7 @@
+import { type LoginRequest, LoginRequestSchema, type LoginResponse } from '@haflux/contracts';
 import { Body, Controller, HttpCode, Post, UnauthorizedException } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { LoginRequestSchema, type LoginRequest, type LoginResponse } from '@haflux/contracts';
-import { AuthService } from './auth.service';
+import type { AuthService } from './auth.service';
 
 @ApiTags('auth')
 @Controller('auth')

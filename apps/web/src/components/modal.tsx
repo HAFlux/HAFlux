@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
 export interface ModalProps {
@@ -75,7 +75,7 @@ export function Modal({
           style={{ borderBottom: '1px solid var(--color-separator)' }}
         >
           <div className="flex flex-col gap-1">
-            <span className="cyber-label">{`// modal`}</span>
+            <span className="cyber-label">{'// modal'}</span>
             <h2 className="cyber-heading text-lg">{title}</h2>
             {description && (
               <p className="text-sm" style={{ color: 'var(--color-muted)' }}>

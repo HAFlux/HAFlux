@@ -1,6 +1,6 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { ProxyHostsService } from './proxy-hosts.service';
+import type { PrismaService } from '../prisma/prisma.service';
+import type { ProxyHostsService } from './proxy-hosts.service';
 
 /**
  * Периодический probing upstream'ов всех proxy host'ов.

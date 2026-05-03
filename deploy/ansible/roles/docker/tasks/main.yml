@@ -27,6 +27,15 @@
     update_cache: true
   when: ansible_facts.os_family == "Debian"
 
+# Explicit refresh so the next package install also works under --check
+# (apt_repository with update_cache=true is a noop in check mode).
+- name: Refresh apt cache after adding Docker repo
+  ansible.builtin.apt:
+    update_cache: true
+  check_mode: false
+  changed_when: false
+  when: ansible_facts.os_family == "Debian"
+
 - name: Install Docker engine + compose plugin
   ansible.builtin.package:
     name:
@@ -100,7 +109,7 @@
     mode: "0755"
     content: |
       #!/usr/bin/env bash
-      # Auto-installed by HPM Ansible. Runs daily via systemd timer.
+      # Auto-installed by HAFlux Ansible. Runs daily via systemd timer.
       set -euo pipefail
 
       LOG=/var/log/docker-maintenance.log
@@ -133,7 +142,7 @@
     mode: "0644"
     content: |
       [Unit]
-      Description=HPM docker maintenance (prune images/containers/builder cache)
+      Description=HAFlux docker maintenance (prune images/containers/builder cache)
       After=docker.service
       Requires=docker.service
 
@@ -149,7 +158,7 @@
     mode: "0644"
     content: |
       [Unit]
-      Description=HPM docker maintenance (daily)
+      Description=HAFlux docker maintenance (daily)
 
       [Timer]
       OnCalendar=daily

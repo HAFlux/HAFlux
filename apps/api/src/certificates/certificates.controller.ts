@@ -1,3 +1,4 @@
+import { CloudflareCredentialsSchema } from '@haflux/contracts';
 import {
   BadRequestException,
   Body,
@@ -9,15 +10,14 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
-import { CloudflareCredentialsSchema } from '@haflux/contracts';
-import { CloudflareDnsProvider } from './cloudflare.provider';
-import { CertificatesService } from './certificates.service';
-import { CertificateRenewService } from './renew.service';
 import { ErrorCode } from '../common/errors';
 import { zodToAppException } from '../common/zod-to-error';
+import type { CertificatesService } from './certificates.service';
+import type { CloudflareDnsProvider } from './cloudflare.provider';
+import type { CertificateRenewService } from './renew.service';
 
 /**
  * ACME-валидное email требует:
@@ -47,7 +47,7 @@ const IssueRequestSchema = z.object({
         const tld = v.split('@')[1]?.split('.').pop()?.toLowerCase();
         return tld !== undefined && tld.length >= 2 && !RESERVED_TLDS.has(tld);
       },
-      { message: '.local / .test / .localhost are rejected by Let\'s Encrypt' },
+      { message: ".local / .test / .localhost are rejected by Let's Encrypt" },
     ),
 });
 
@@ -78,9 +78,7 @@ export class CertificatesController {
   }
 
   @Post('providers/cloudflare')
-  saveCloudflare(
-    @Body() body: { name: string; apiToken: string; accountId?: string },
-  ) {
+  saveCloudflare(@Body() body: { name: string; apiToken: string; accountId?: string }) {
     return this.svc.saveCloudflareProvider(body);
   }
 

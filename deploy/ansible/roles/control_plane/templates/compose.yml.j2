@@ -1,10 +1,8 @@
 # Сгенерировано Ansible (роль control_plane). Не редактировать вручную.
 {% if haflux_image_source == "build" %}
 {% set api_image = "haflux/api:local" %}
-{% set web_image = "haflux/web:local" %}
 {% else %}
-{% set api_image = haflux_image_registry ~ "/waf-api:" ~ haflux_image_tag %}
-{% set web_image = haflux_image_registry ~ "/waf-web:" ~ haflux_image_tag %}
+{% set api_image = haflux_image_registry ~ "/api:" ~ haflux_image_tag %}
 {% endif %}
 
 services:
@@ -59,20 +57,8 @@ services:
       redis: { condition: service_started }
     networks: [internal, edge]
     ports:
-      - "{{ haflux_api_port }}:3000"
-
-  web:
-{% if haflux_image_source == "build" %}
-    build:
-      context: {{ haflux_install_dir }}/src
-      dockerfile: apps/web/Dockerfile
-{% endif %}
-    image: {{ web_image }}
-    restart: unless-stopped
-    depends_on: [api]
-    networks: [edge]
-    ports:
-      - "{{ haflux_web_port }}:80"
+      # api слушает только на loopback; HAProxy на host network достаёт его через 127.0.0.1.
+      - "127.0.0.1:{{ haflux_api_port }}:3000"
 
   haproxy:
     image: {{ haflux_haproxy_image }}

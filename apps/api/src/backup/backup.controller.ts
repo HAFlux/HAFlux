@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Post, Res, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
-import { BackupService } from './backup.service';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import type { BackupService } from './backup.service';
 
 interface ReplyLike {
   header(name: string, value: string): ReplyLike;

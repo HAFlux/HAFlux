@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import { AppException, ErrorCode } from '../common/errors';
+import type { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class ClustersService {
@@ -15,8 +15,7 @@ export class ClustersService {
     input: { name?: string; mode?: 'STANDALONE' | 'ACTIVE_PASSIVE' | 'ACTIVE_ACTIVE' },
   ) {
     const existing = await this.prisma.cluster.findUnique({ where: { id } });
-    if (!existing)
-      throw new AppException(ErrorCode.CLUSTER_NOT_FOUND, 'Cluster not found', 404);
+    if (!existing) throw new AppException(ErrorCode.CLUSTER_NOT_FOUND, 'Cluster not found', 404);
 
     if (input.name && input.name !== existing.name) {
       const taken = await this.prisma.cluster.findUnique({
@@ -95,8 +94,7 @@ export class ClustersService {
       where: { id },
       include: { nodes: true },
     });
-    if (!cluster)
-      throw new AppException(ErrorCode.CLUSTER_NOT_FOUND, 'Cluster not found', 404);
+    if (!cluster) throw new AppException(ErrorCode.CLUSTER_NOT_FOUND, 'Cluster not found', 404);
     return cluster;
   }
 
@@ -109,8 +107,7 @@ export class ClustersService {
 
   async remove(id: string) {
     const cluster = await this.prisma.cluster.findUnique({ where: { id } });
-    if (!cluster)
-      throw new AppException(ErrorCode.CLUSTER_NOT_FOUND, 'Cluster not found', 404);
+    if (!cluster) throw new AppException(ErrorCode.CLUSTER_NOT_FOUND, 'Cluster not found', 404);
     await this.prisma.cluster.delete({ where: { id } });
     return { ok: true };
   }

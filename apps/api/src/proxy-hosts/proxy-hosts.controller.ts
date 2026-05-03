@@ -9,30 +9,28 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 import { ErrorCode } from '../common/errors';
 import { zodToAppException } from '../common/zod-to-error';
-import { ProxyHostsService } from './proxy-hosts.service';
-import { ProxyHostsHealthService } from './health.service';
-import { HaproxyLogsService } from './logs.service';
+import type { ProxyHostsHealthService } from './health.service';
+import type { HaproxyLogsService } from './logs.service';
+import type { ProxyHostsService } from './proxy-hosts.service';
 
 const DomainSchema = z
   .string()
   .min(1, 'domain is required')
-  .regex(
-    /^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i,
-    { message: 'must be a valid hostname (FQDN), wildcard *. allowed' },
-  );
+  .regex(/^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i, {
+    message: 'must be a valid hostname (FQDN), wildcard *. allowed',
+  });
 
 const ForwardHostSchema = z
   .string()
   .min(1, 'forwardHost is required')
-  .regex(
-    /^([a-z0-9_-]+(\.[a-z0-9_-]+)+|[0-9]{1,3}(\.[0-9]{1,3}){3}|localhost)$/i,
-    { message: 'must be IP, hostname, or "localhost"' },
-  );
+  .regex(/^([a-z0-9_-]+(\.[a-z0-9_-]+)+|[0-9]{1,3}(\.[0-9]{1,3}){3}|localhost)$/i, {
+    message: 'must be IP, hostname, or "localhost"',
+  });
 
 const CreateSchema = z.object({
   clusterId: z.string().min(1, 'clusterId is required'),

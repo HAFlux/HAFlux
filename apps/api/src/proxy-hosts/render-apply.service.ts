@@ -1,13 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import type { AccessGroup, ErrorFile } from '@prisma/client';
+import { exec } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import { PrismaService } from '../prisma/prisma.service';
-import { CryptoService } from '../certificates/crypto.service';
+import { Injectable, Logger } from '@nestjs/common';
+import type { ConfigService } from '@nestjs/config';
+import type { AccessGroup, ErrorFile } from '@prisma/client';
+import type { CryptoService } from '../certificates/crypto.service';
 import { AppException, ErrorCode } from '../common/errors';
+import type { PrismaService } from '../prisma/prisma.service';
 
 const execAsync = promisify(exec);
 
@@ -79,8 +79,7 @@ export class ProxyHostsRenderApplyService {
     private readonly cfg: ConfigService,
   ) {
     this.dataDir = this.cfg.get<string>('HAPROXY_DATA_DIR') ?? '/haproxy-data';
-    this.haproxyContainer =
-      this.cfg.get<string>('HAPROXY_CONTAINER_NAME') ?? 'haproxy-balancer';
+    this.haproxyContainer = this.cfg.get<string>('HAPROXY_CONTAINER_NAME') ?? 'haproxy-balancer';
   }
 
   /**
@@ -109,7 +108,7 @@ export class ProxyHostsRenderApplyService {
     const certs = await this.prisma.certificate.findMany({
       where: { id: { in: certIds } },
     });
-    const certById = new Map(certs.map((c) => [c.id, c]));
+    const _certById = new Map(certs.map((c) => [c.id, c]));
 
     const hosts: ProxyHostWithAccess[] = rawHosts.map((h) => ({
       id: h.id,
@@ -245,13 +244,7 @@ export class ProxyHostsRenderApplyService {
   /** Полный тело errorfile для HAProxy из HTML-документа (без HTTP-заголовков сверху). */
   buildHttpErrorFilePayload(code: number, htmlBody: string): string {
     const lengthBytes = Buffer.byteLength(htmlBody, 'utf8');
-    const head =
-      `HTTP/1.1 ${code} ${this.statusText(code)}\r\n` +
-      `Cache-Control: no-cache\r\n` +
-      `Content-Type: text/html; charset=utf-8\r\n` +
-      `Content-Length: ${lengthBytes}\r\n` +
-      `Connection: close\r\n` +
-      `\r\n`;
+    const head = `HTTP/1.1 ${code} ${this.statusText(code)}\r\nCache-Control: no-cache\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: ${lengthBytes}\r\nConnection: close\r\n\r\n`;
     return head + htmlBody;
   }
 
@@ -261,28 +254,35 @@ export class ProxyHostsRenderApplyService {
   }
 
   private statusText(code: number): string {
-    return ({
-      400: 'Bad Request',
-      403: 'Forbidden',
-      404: 'Not Found',
-      408: 'Request Timeout',
-      500: 'Internal Server Error',
-      502: 'Bad Gateway',
-      503: 'Service Unavailable',
-      504: 'Gateway Timeout',
-    } as Record<number, string>)[code] ?? 'Error';
+    return (
+      (
+        {
+          400: 'Bad Request',
+          403: 'Forbidden',
+          404: 'Not Found',
+          408: 'Request Timeout',
+          500: 'Internal Server Error',
+          502: 'Bad Gateway',
+          503: 'Service Unavailable',
+          504: 'Gateway Timeout',
+        } as Record<number, string>
+      )[code] ?? 'Error'
+    );
   }
 
   private renderErrorHtml(code: number): string {
-    const explain = ({
-      400: 'Malformed request — check headers, method or body.',
-      403: 'Access denied by access list or authentication.',
-      408: 'Client took too long to send the request.',
-      500: 'Upstream returned an internal error.',
-      502: 'No upstream server available right now.',
-      503: 'Service is temporarily unavailable. Try again shortly.',
-      504: 'Upstream did not reply in time.',
-    } as Record<number, string>)[code] ?? 'Something went wrong.';
+    const explain =
+      (
+        {
+          400: 'Malformed request — check headers, method or body.',
+          403: 'Access denied by access list or authentication.',
+          408: 'Client took too long to send the request.',
+          500: 'Upstream returned an internal error.',
+          502: 'No upstream server available right now.',
+          503: 'Service is temporarily unavailable. Try again shortly.',
+          504: 'Upstream did not reply in time.',
+        } as Record<number, string>
+      )[code] ?? 'Something went wrong.';
     const text = this.statusText(code);
     return `<!doctype html>
 <html lang="en">
@@ -394,7 +394,9 @@ p{margin:1rem 0 0;line-height:1.6;opacity:.8;font-size:14px}
     hasCerts: boolean,
     groupsById: Map<string, ResolvedAccessGroup>,
   ): string {
-    const httpHosts = hosts.filter((h) => h.forwardScheme === 'http' || h.forwardScheme === 'https');
+    const httpHosts = hosts.filter(
+      (h) => h.forwardScheme === 'http' || h.forwardScheme === 'https',
+    );
     const tcpHosts = hosts.filter((h) => h.forwardScheme === 'tcp' || h.forwardScheme === 'udp');
 
     const out: string[] = [];
@@ -461,9 +463,7 @@ global
         }
       }
       for (const gid of feHttpGroupIds) {
-        out.push(
-          `  acl ${this.aclSrcName(gid)} src -f /etc/haproxy/acl/hpm_${gid}.lst`,
-        );
+        out.push(`  acl ${this.aclSrcName(gid)} src -f /etc/haproxy/acl/hpm_${gid}.lst`);
       }
       if (feHttpGroupIds.size > 0) out.push('');
     }
@@ -556,9 +556,7 @@ global
           }
         }
         for (const gid of feHttpsGroupIds) {
-          out.push(
-            `  acl ${this.aclSrcName(gid)} src -f /etc/haproxy/acl/hpm_${gid}.lst`,
-          );
+          out.push(`  acl ${this.aclSrcName(gid)} src -f /etc/haproxy/acl/hpm_${gid}.lst`);
         }
         if (feHttpsGroupIds.size > 0) out.push('');
       }
@@ -628,7 +626,9 @@ global
         out.push('');
       } else {
         // udp — placeholder; включаем когда HAProxy с experimental.
-        out.push(`# WARN: udp scheme is experimental in HAProxy — host ${h.id} (${h.domain}) skipped`);
+        out.push(
+          `# WARN: udp scheme is experimental in HAProxy — host ${h.id} (${h.domain}) skipped`,
+        );
       }
     }
 
@@ -641,9 +641,7 @@ global
 
     for (const h of httpHosts) {
       const useSsl = h.forwardScheme === 'https' ? ' ssl verify none' : '';
-      const tunnelTimeouts = h.wsSupport
-        ? '\n  timeout tunnel 1h\n  timeout client-fin 30s'
-        : '';
+      const tunnelTimeouts = h.wsSupport ? '\n  timeout tunnel 1h\n  timeout client-fin 30s' : '';
       const headerLines =
         h.customHeaders != null
           ? Object.entries(h.customHeaders)

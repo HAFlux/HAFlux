@@ -1,10 +1,10 @@
 import 'reflect-metadata';
-import path from 'node:path';
 import { existsSync } from 'node:fs';
+import path from 'node:path';
+import fastifyStatic from '@fastify/static';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
-import { ValidationPipe, Logger } from '@nestjs/common';
-import fastifyStatic from '@fastify/static';
 import { AppModule } from './app.module';
 import { SpaFallbackFilter } from './spa.filter';
 
@@ -42,14 +42,17 @@ async function bootstrap() {
       register: (plugin: unknown, opts: unknown) => Promise<void>;
     };
 
-    await fastify.register(fastifyStatic as unknown as never, {
-      root: staticDir,
-      prefix: '/',
-      decorateReply: true,
-      wildcard: false,
-      cacheControl: true,
-      maxAge: '1h',
-    } as never);
+    await fastify.register(
+      fastifyStatic as unknown as never,
+      {
+        root: staticDir,
+        prefix: '/',
+        decorateReply: true,
+        wildcard: false,
+        cacheControl: true,
+        maxAge: '1h',
+      } as never,
+    );
   }
 
   // SPA fallback через ExceptionFilter (потому что fastify.setNotFoundHandler

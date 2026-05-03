@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import { AppException, ErrorCode } from '../common/errors';
+import type { PrismaService } from '../prisma/prisma.service';
 
 const TABLES = [
   'organization',
@@ -65,7 +65,10 @@ export class BackupService {
 
   async exportAll(): Promise<BackupPayload> {
     const data: Partial<Record<Table, Record<string, unknown>[]>> = {};
-    const client = this.prisma as unknown as Record<string, { findMany: () => Promise<Record<string, unknown>[]> } | undefined>;
+    const client = this.prisma as unknown as Record<
+      string,
+      { findMany: () => Promise<Record<string, unknown>[]> } | undefined
+    >;
     for (const t of TABLES) {
       const model = client[t];
       if (!model) throw new AppException(ErrorCode.INTERNAL, `Prisma model missing: ${t}`, 500);
@@ -134,7 +137,11 @@ export class BackupService {
       { timeout: 120_000, maxWait: 30_000 },
     );
 
-    this.logger.log(`Restore complete: ${Object.entries(restored).map(([k, v]) => `${k}=${v}`).join(' ')}`);
+    this.logger.log(
+      `Restore complete: ${Object.entries(restored)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(' ')}`,
+    );
     return { restored };
   }
 }

@@ -1,7 +1,7 @@
-@import 'tailwindcss';
-@import '@heroui/styles';
-@import '@fontsource-variable/geist/index.css';
-@import '@fontsource-variable/geist-mono/index.css';
+@import "tailwindcss";
+@import "@heroui/styles";
+@import "@fontsource-variable/geist/index.css";
+@import "@fontsource-variable/geist-mono/index.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -13,11 +13,10 @@
  */
 
 @theme {
-  --font-sans:
-    'Geist Variable', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
-    Roboto, sans-serif;
-  --font-mono:
-    'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    monospace;
 
   --color-bg: #ffffff;
   --color-fg: #000000;
@@ -55,16 +54,13 @@ html {
 
 body {
   font-family: var(--font-sans);
-  font-feature-settings:
-    'cv02', 'cv03', 'cv04', 'cv11',
-    'ss01', 'ss03';
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01", "ss03";
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   background-color: var(--color-bg);
   color: var(--color-fg);
-  transition:
-    background-color var(--motion-normal) var(--motion-ease-out),
-    color var(--motion-normal) var(--motion-ease-out);
+  transition: background-color var(--motion-normal) var(--motion-ease-out), color
+    var(--motion-normal) var(--motion-ease-out);
   background-image: repeating-linear-gradient(
     180deg,
     transparent 0,
@@ -103,7 +99,7 @@ samp {
 }
 
 .cyber-heading::before {
-  content: '> ';
+  content: "> ";
   opacity: 0.6;
 }
 
@@ -116,11 +112,11 @@ samp {
   letter-spacing: 0.05em;
 }
 .cyber-bracket::before {
-  content: '[';
+  content: "[";
   opacity: 0.5;
 }
 .cyber-bracket::after {
-  content: ']';
+  content: "]";
   opacity: 0.5;
 }
 
@@ -135,10 +131,8 @@ samp {
   color: var(--color-fg);
   padding: 0.125rem 0.5rem;
   border-radius: 2px;
-  transition:
-    border-color var(--motion-normal) var(--motion-ease-out),
-    background-color var(--motion-normal) var(--motion-ease-out),
-    color var(--motion-fast) var(--motion-ease-out);
+  transition: border-color var(--motion-normal) var(--motion-ease-out), background-color
+    var(--motion-normal) var(--motion-ease-out), color var(--motion-fast) var(--motion-ease-out);
 }
 
 .cyber-input {
@@ -151,11 +145,9 @@ samp {
   padding: 0 0.75rem;
   font-family: var(--font-mono);
   font-size: 0.875rem;
-  transition:
-    border-color var(--motion-normal) var(--motion-ease-out),
-    box-shadow var(--motion-normal) var(--motion-ease-out),
-    background-color var(--motion-normal) var(--motion-ease-out),
-    color var(--motion-fast) var(--motion-ease-out);
+  transition: border-color var(--motion-normal) var(--motion-ease-out), box-shadow
+    var(--motion-normal) var(--motion-ease-out), background-color var(--motion-normal)
+    var(--motion-ease-out), color var(--motion-fast) var(--motion-ease-out);
 }
 .cyber-input::placeholder {
   color: var(--color-muted);
@@ -200,7 +192,7 @@ samp {
   transform: translateY(0);
 }
 .cyber-btn:disabled,
-.cyber-btn[aria-disabled='true'] {
+.cyber-btn[aria-disabled="true"] {
   opacity: 0.4;
   cursor: not-allowed;
 }
@@ -219,10 +211,9 @@ samp {
   border: 1px solid var(--color-separator);
   border-radius: 2px;
   background: var(--color-bg);
-  transition:
-    border-color var(--motion-normal) var(--motion-ease-out),
-    box-shadow var(--motion-slow) var(--motion-ease-out),
-    background-color var(--motion-normal) var(--motion-ease-out);
+  transition: border-color var(--motion-normal) var(--motion-ease-out), box-shadow
+    var(--motion-slow) var(--motion-ease-out), background-color var(--motion-normal)
+    var(--motion-ease-out);
 }
 
 /* Карточки-ссылки (дашборд и т.п.) — лёгкая «подъёмная» тень при hover */
@@ -240,10 +231,8 @@ a.cyber-card:hover,
   color: var(--color-fg);
   text-decoration: none;
   border-bottom: 1px solid var(--color-separator);
-  transition:
-    border-color var(--motion-normal) var(--motion-ease-out),
-    color var(--motion-normal) var(--motion-ease-out),
-    opacity var(--motion-fast) var(--motion-ease-out);
+  transition: border-color var(--motion-normal) var(--motion-ease-out), color var(--motion-normal)
+    var(--motion-ease-out), opacity var(--motion-fast) var(--motion-ease-out);
 }
 .cyber-link:hover {
   border-color: var(--color-fg);
@@ -265,12 +254,18 @@ textarea {
 /* ─── Console-typing animations ──────────────────────────────────── */
 
 @keyframes blink-cursor {
-  0%, 49% { opacity: 1; }
-  50%, 100% { opacity: 0; }
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
 }
 
 .cyber-cursor::after {
-  content: '_';
+  content: "_";
   display: inline-block;
   margin-left: 2px;
   animation: blink-cursor 900ms steps(1) infinite;
@@ -279,8 +274,12 @@ textarea {
 }
 
 @keyframes typing-reveal {
-  from { width: 0 }
-  to { width: 100% }
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
 }
 
 .cyber-typing {
@@ -288,9 +287,7 @@ textarea {
   overflow: hidden;
   white-space: nowrap;
   border-right: 2px solid currentColor;
-  animation:
-    typing-reveal 1.4s steps(40, end),
-    blink-cursor 800ms steps(1) 1.5s infinite;
+  animation: typing-reveal 1.4s steps(40, end), blink-cursor 800ms steps(1) 1.5s infinite;
 }
 
 /* Screen reader only — полный текст при анимации печати */
@@ -330,7 +327,9 @@ textarea {
   }
   .hpm-sidebar {
     position: fixed !important;
-    top: 0; left: 0; right: 0;
+    top: 0;
+    left: 0;
+    right: 0;
     width: 100% !important;
     height: auto !important;
     z-index: 40;
@@ -476,7 +475,7 @@ textarea {
   background: var(--color-bg);
   border: 1px solid var(--color-separator);
   border-radius: 2px;
-  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   padding: 4px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   /* HeroUI/React Aria не всегда выставляют --radix-popper-anchor-width; fallback 100% = вся ширина окна */
@@ -488,7 +487,7 @@ textarea {
   box-sizing: border-box;
 }
 
-.cyber-popover :is([role='listbox'], ul) {
+.cyber-popover :is([role="listbox"], ul) {
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -500,7 +499,7 @@ textarea {
 }
 
 .cyber-popover-item,
-.cyber-popover :is([role='option'], li) {
+.cyber-popover :is([role="option"], li) {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -514,23 +513,23 @@ textarea {
   transition: background-color 120ms ease, color 120ms ease;
 }
 
-.cyber-popover :is([role='option'], li):hover,
+.cyber-popover :is([role="option"], li):hover,
 .cyber-popover-item:hover,
-.cyber-popover [data-hover='true'],
-.cyber-popover [data-focused='true'],
-.cyber-popover [data-focus-visible='true'] {
+.cyber-popover [data-hover="true"],
+.cyber-popover [data-focused="true"],
+.cyber-popover [data-focus-visible="true"] {
   background: var(--color-fg);
   color: var(--color-bg);
 }
 
-.cyber-popover [data-selected='true'],
-.cyber-popover [aria-selected='true'] {
+.cyber-popover [data-selected="true"],
+.cyber-popover [aria-selected="true"] {
   background: var(--color-fg);
   color: var(--color-bg);
 }
 
-.cyber-popover [data-disabled='true'],
-.cyber-popover [aria-disabled='true'] {
+.cyber-popover [data-disabled="true"],
+.cyber-popover [aria-disabled="true"] {
   opacity: 0.4;
   cursor: not-allowed;
 }

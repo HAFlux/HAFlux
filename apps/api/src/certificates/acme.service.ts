@@ -3,8 +3,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as acme from 'acme-client';
 type AcmeAuthz = { identifier: { value: string } };
 type AcmeChallenge = { type: string };
-import { CloudflareDnsProvider } from './cloudflare.provider';
 import { AppException, ErrorCode } from '../common/errors';
+import type { CloudflareDnsProvider } from './cloudflare.provider';
 
 export interface IssueOptions {
   domain: string; // apex (e.g. example.com)
@@ -64,7 +64,11 @@ export class AcmeService {
         email: opts.email,
         termsOfServiceAgreed: true,
         challengePriority: ['dns-01'],
-        challengeCreateFn: async (authz: AcmeAuthz, challenge: AcmeChallenge, keyAuthorization: string) => {
+        challengeCreateFn: async (
+          authz: AcmeAuthz,
+          challenge: AcmeChallenge,
+          keyAuthorization: string,
+        ) => {
           if (challenge.type !== 'dns-01') {
             throw new Error(`Unsupported challenge type ${challenge.type}`);
           }
@@ -113,7 +117,8 @@ export class AcmeService {
       notBefore: info.notBefore,
       notAfter: info.notAfter,
       sans: info.domains?.altNames?.length ? info.domains.altNames : altNames,
-      issuer: info.issuer?.commonName ?? (opts.staging ? '(STAGING) Let\'s Encrypt' : "Let's Encrypt"),
+      issuer:
+        info.issuer?.commonName ?? (opts.staging ? "(STAGING) Let's Encrypt" : "Let's Encrypt"),
     };
   }
 }

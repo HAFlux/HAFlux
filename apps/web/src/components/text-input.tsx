@@ -1,5 +1,5 @@
-import { forwardRef, type InputHTMLAttributes } from 'react';
 import clsx from 'clsx';
+import { type InputHTMLAttributes, forwardRef } from 'react';
 
 export const TextInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   function TextInput({ className, ...props }, ref) {

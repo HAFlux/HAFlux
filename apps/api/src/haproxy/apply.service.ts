@@ -1,8 +1,8 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { PrismaService } from '../prisma/prisma.service';
-import { CfgRenderer } from './renderers/cfg.renderer';
-import { TransportFactory } from './transports/transport.factory';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import type { PrismaService } from '../prisma/prisma.service';
+import type { CfgRenderer } from './renderers/cfg.renderer';
+import type { TransportFactory } from './transports/transport.factory';
 import type { ApplyOptions, ApplyResult, NodeApplyResult } from './types';
 
 @Injectable()

@@ -13,7 +13,6 @@
       "**/node_modules",
       "**/.next",
       "**/.vite",
-      "apps/agent",
       "apps/api/prisma/migrations"
     ]
   },
@@ -33,15 +32,26 @@
         "useImportType": "error"
       },
       "suspicious": {
-        "noConsoleLog": "off"
+        "noConsoleLog": "off",
+        "noArrayIndexKey": "warn",
+        "noAssignInExpressions": "warn"
       },
       "correctness": {
         "noUnusedImports": "error",
-        "noUnusedVariables": "warn"
+        "noUnusedVariables": "warn",
+        "useExhaustiveDependencies": "warn"
+      },
+      "a11y": {
+        "noSvgWithoutTitle": "warn",
+        "useSemanticElements": "warn",
+        "noLabelWithoutControl": "warn"
       }
     }
   },
   "javascript": {
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": true
+    },
     "formatter": {
       "quoteStyle": "single",
       "trailingCommas": "all",

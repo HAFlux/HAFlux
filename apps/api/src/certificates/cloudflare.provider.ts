@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
 import type { CloudflareCredentials } from '@haflux/contracts';
+import { Injectable, Logger } from '@nestjs/common';
 import { AppException, ErrorCode } from '../common/errors';
 
 interface CfTokenStatus {
@@ -65,11 +65,7 @@ export class CloudflareDnsProvider {
       }
       parts.shift();
     }
-    throw new AppException(
-      ErrorCode.ZONE_NOT_FOUND,
-      `No Cloudflare zone covers ${fqdn}`,
-      404,
-    );
+    throw new AppException(ErrorCode.ZONE_NOT_FOUND, `No Cloudflare zone covers ${fqdn}`, 404);
   }
 
   async addTxtRecord(
@@ -93,11 +89,7 @@ export class CloudflareDnsProvider {
     this.logger.log(`Cloudflare: removed TXT record ${recordId}`);
   }
 
-  async findTxtRecord(
-    token: string,
-    zoneId: string,
-    name: string,
-  ): Promise<CfDnsRecord | null> {
+  async findTxtRecord(token: string, zoneId: string, name: string): Promise<CfDnsRecord | null> {
     const arr = await this.cf<CfDnsRecord[]>(
       `/zones/${zoneId}/dns_records?type=TXT&name=${encodeURIComponent(name)}`,
       token,

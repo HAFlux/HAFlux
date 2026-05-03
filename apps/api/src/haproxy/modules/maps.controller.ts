@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
-import { MapsService } from './maps.service';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import type { MapsService } from './maps.service';
 
 @ApiTags('haproxy:maps')
 @ApiBearerAuth()

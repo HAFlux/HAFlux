@@ -1,12 +1,12 @@
 import { Body, Controller, Get, Patch, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
-import { z } from 'zod';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import * as argon2 from 'argon2';
-import { PrismaService } from '../prisma/prisma.service';
-import { AuthService } from './auth.service';
+import { z } from 'zod';
 import { AppException, ErrorCode } from '../common/errors';
 import { zodToAppException } from '../common/zod-to-error';
+import type { PrismaService } from '../prisma/prisma.service';
+import type { AuthService } from './auth.service';
 import type { JwtPayload } from './jwt.strategy';
 
 const RESERVED_TLDS = new Set(['local', 'localhost', 'test', 'invalid', 'example']);
@@ -16,19 +16,25 @@ const UpdateMeSchema = z
     email: z
       .string()
       .email('must be a valid address')
-      .refine((v) => {
-        const tld = v.split('@')[1]?.split('.').pop()?.toLowerCase();
-        return tld !== undefined && tld.length >= 2 && !RESERVED_TLDS.has(tld);
-      }, { message: '.local / .test / .localhost are reserved' })
+      .refine(
+        (v) => {
+          const tld = v.split('@')[1]?.split('.').pop()?.toLowerCase();
+          return tld !== undefined && tld.length >= 2 && !RESERVED_TLDS.has(tld);
+        },
+        { message: '.local / .test / .localhost are reserved' },
+      )
       .optional(),
     displayName: z.string().min(1).max(100).optional(),
     /** Текущий пароль — обязателен ВСЕГДА для подтверждения личности. */
     currentPassword: z.string().min(1, 'currentPassword is required'),
     newPassword: z.string().min(8, 'newPassword must be ≥ 8 chars').max(256).optional(),
   })
-  .refine((d) => d.email !== undefined || d.newPassword !== undefined || d.displayName !== undefined, {
-    message: 'nothing to update — provide email, displayName or newPassword',
-  });
+  .refine(
+    (d) => d.email !== undefined || d.newPassword !== undefined || d.displayName !== undefined,
+    {
+      message: 'nothing to update — provide email, displayName or newPassword',
+    },
+  );
 
 @ApiTags('me')
 @ApiBearerAuth()
@@ -68,22 +74,14 @@ export class MeController {
 
     const ok = await argon2.verify(user.passwordHash, currentPassword);
     if (!ok) {
-      throw new AppException(
-        ErrorCode.UNAUTHORIZED,
-        'Current password is incorrect',
-        401,
-      );
+      throw new AppException(ErrorCode.UNAUTHORIZED, 'Current password is incorrect', 401);
     }
 
     // Проверка на занятый email
     if (email && email.toLowerCase() !== user.email) {
       const taken = await this.prisma.user.findUnique({ where: { email: email.toLowerCase() } });
       if (taken)
-        throw new AppException(
-          ErrorCode.ALREADY_EXISTS,
-          `Email ${email} is already in use`,
-          409,
-        );
+        throw new AppException(ErrorCode.ALREADY_EXISTS, `Email ${email} is already in use`, 409);
     }
 
     const data: {

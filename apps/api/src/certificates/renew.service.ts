@@ -1,9 +1,9 @@
-import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { AcmeService } from './acme.service';
-import { CryptoService } from './crypto.service';
-import { AppException, ErrorCode } from '../common/errors';
 import { createHash } from 'node:crypto';
+import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import { AppException, ErrorCode } from '../common/errors';
+import type { PrismaService } from '../prisma/prisma.service';
+import type { AcmeService } from './acme.service';
+import type { CryptoService } from './crypto.service';
 
 const RENEW_THRESHOLD_DAYS = 10;
 const TICK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6h
@@ -51,9 +51,7 @@ export class CertificateRenewService implements OnModuleInit, OnModuleDestroy {
       try {
         await this.renew(c.id);
       } catch (err) {
-        this.logger.warn(
-          `auto-renew failed for ${c.commonName}: ${(err as Error).message}`,
-        );
+        this.logger.warn(`auto-renew failed for ${c.commonName}: ${(err as Error).message}`);
       }
     }
   }
@@ -64,13 +62,9 @@ export class CertificateRenewService implements OnModuleInit, OnModuleDestroy {
    */
   async renew(id: string) {
     const cert = await this.prisma.certificate.findUnique({ where: { id } });
-    if (!cert)
-      throw new AppException(ErrorCode.CERT_NOT_FOUND, 'Certificate not found', 404);
+    if (!cert) throw new AppException(ErrorCode.CERT_NOT_FOUND, 'Certificate not found', 404);
     if (cert.source !== 'ACME') {
-      throw new AppException(
-        ErrorCode.VALIDATION_FAILED,
-        'Only ACME certificates can be renewed',
-      );
+      throw new AppException(ErrorCode.VALIDATION_FAILED, 'Only ACME certificates can be renewed');
     }
 
     const provider = await this.prisma.dnsProvider.findFirst({
@@ -94,7 +88,7 @@ export class CertificateRenewService implements OnModuleInit, OnModuleDestroy {
     const result = await this.acme.issue({
       domain: apex,
       wildcard,
-      email: 'admin@' + apex, // best-effort, можно сделать настройкой org
+      email: `admin@${apex}`, // best-effort, можно сделать настройкой org
       staging: false, // renew всегда production
       cfApiToken: creds.apiToken,
     });
@@ -115,9 +109,7 @@ export class CertificateRenewService implements OnModuleInit, OnModuleDestroy {
       },
     });
 
-    this.logger.log(
-      `renew ok: ${cert.commonName} valid until ${updated.notAfter.toISOString()}`,
-    );
+    this.logger.log(`renew ok: ${cert.commonName} valid until ${updated.notAfter.toISOString()}`);
     return {
       id: updated.id,
       commonName: updated.commonName,

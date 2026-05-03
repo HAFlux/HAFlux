@@ -9,28 +9,37 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  NODE_VERSION: '20.18.0'
+  PNPM_VERSION: '9.15.0'
+
 jobs:
   node:
-    name: Node (lint / typecheck / build)
+    name: lint · typecheck · test · build
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 9.15.0
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20.18.0
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
-      - name: Install
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile=false
 
       - name: Generate Prisma client
         working-directory: apps/api
         run: pnpm prisma:generate
+
+      - name: Build contracts
+        run: pnpm --filter @haflux/contracts build
 
       - name: Lint
         run: pnpm lint
@@ -38,39 +47,28 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Test
+        run: pnpm test
+
       - name: Build
         run: pnpm build
 
-  go:
-    name: Go agent (vet / build)
-    runs-on: ubuntu-24.04
-    defaults:
-      run:
-        working-directory: apps/agent
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-          cache-dependency-path: apps/agent/go.sum
-      - name: Tidy
-        run: go mod tidy -diff || true
-      - name: Vet
-        run: go vet ./...
-      - name: Build
-        run: go build -o /tmp/agent ./cmd/agent
-
   docker:
-    name: Docker build (smoke)
+    name: docker build (smoke)
     runs-on: ubuntu-24.04
-    needs: [node, go]
+    needs: [node]
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Set up buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Build api image
-        run: docker build -f apps/api/Dockerfile -t haflux/api:ci .
-      - name: Build web image
-        run: docker build -f apps/web/Dockerfile -t haflux/web:ci .
-      - name: Build agent image
-        run: docker build -f apps/agent/Dockerfile -t haflux/agent:ci .
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build api image (cached, no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: false
+          tags: haflux/api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

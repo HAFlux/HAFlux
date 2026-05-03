@@ -1,14 +1,14 @@
 import { Module } from '@nestjs/common';
-import { CfgRenderer } from './renderers/cfg.renderer';
-import { TransportFactory } from './transports/transport.factory';
-import { ApplyService } from './apply.service';
 import { ApplyController } from './apply.controller';
-import { FrontendsController } from './entities/frontends.controller';
-import { FrontendsService } from './entities/frontends.service';
+import { ApplyService } from './apply.service';
 import { BackendsController } from './entities/backends.controller';
 import { BackendsService } from './entities/backends.service';
+import { FrontendsController } from './entities/frontends.controller';
+import { FrontendsService } from './entities/frontends.service';
 import { MapsController } from './modules/maps.controller';
 import { MapsService } from './modules/maps.service';
+import { CfgRenderer } from './renderers/cfg.renderer';
+import { TransportFactory } from './transports/transport.factory';
 
 /**
  * Главный модуль управления HAProxy.
@@ -18,12 +18,7 @@ import { MapsService } from './modules/maps.service';
  * (acl-lists, errorfiles, lua-scripts, spoe-agents) — по мере роста UI.
  */
 @Module({
-  controllers: [
-    ApplyController,
-    FrontendsController,
-    BackendsController,
-    MapsController,
-  ],
+  controllers: [ApplyController, FrontendsController, BackendsController, MapsController],
   providers: [
     CfgRenderer,
     TransportFactory,

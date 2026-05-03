@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/modal';
 import { PageHeader } from '@/components/page-header';
 import { PanelLoader } from '@/components/panel-loader';
-import { ApiError, api, type AccessGroupSummary } from '@/lib/api';
+import { type AccessGroupSummary, ApiError, api } from '@/lib/api';
 
 function ClusterTabs({
   clusters,
@@ -49,7 +49,7 @@ export default function AccessGroupsPage() {
   const [activeClusterId, setActiveClusterId] = useState<string | null>(null);
   useEffect(() => {
     if (!activeClusterId && clusters.length > 0) {
-      setActiveClusterId(clusters[0]!.id);
+      setActiveClusterId(clusters[0]?.id);
     }
   }, [activeClusterId, clusters]);
 
@@ -64,8 +64,7 @@ export default function AccessGroupsPage() {
   const [confirmDelete, setConfirmDelete] = useState<AccessGroupSummary | null>(null);
 
   const remove = useMutation({
-    mutationFn: (g: AccessGroupSummary) =>
-      api.clusters.accessGroups.delete(activeClusterId!, g.id),
+    mutationFn: (g: AccessGroupSummary) => api.clusters.accessGroups.delete(activeClusterId!, g.id),
     onSuccess: () => {
       setConfirmDelete(null);
       qc.invalidateQueries({ queryKey: ['access-groups', activeClusterId] });
@@ -109,7 +108,11 @@ export default function AccessGroupsPage() {
       {activeClusterId && clusters.length > 0 ? (
         <div
           className="cyber-card flex flex-col gap-3 px-5 py-4"
-          style={{ borderLeftWidth: 4, borderLeftStyle: 'solid', borderLeftColor: 'var(--color-fg)' }}
+          style={{
+            borderLeftWidth: 4,
+            borderLeftStyle: 'solid',
+            borderLeftColor: 'var(--color-fg)',
+          }}
         >
           <span className="cyber-label">{t('accessGroups.calloutTitle')}</span>
           <div className="flex flex-col gap-3 text-sm" style={{ color: 'var(--color-muted)' }}>
@@ -339,7 +342,9 @@ function AccessGroupFormModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={mode === 'create' ? t('accessGroups.modalCreateTitle') : t('accessGroups.modalEditTitle')}
+      title={
+        mode === 'create' ? t('accessGroups.modalCreateTitle') : t('accessGroups.modalEditTitle')
+      }
       description={t('accessGroups.modalDesc')}
       size="lg"
       footer={
@@ -404,9 +409,7 @@ function AccessGroupFormModal({
                   className="cyber-input flex-1 font-mono text-sm"
                   type="password"
                   placeholder={
-                    mode === 'edit'
-                      ? t('accessGroups.authPassKeep')
-                      : t('accessGroups.authPass')
+                    mode === 'edit' ? t('accessGroups.authPassKeep') : t('accessGroups.authPass')
                   }
                   autoComplete="new-password"
                   value={row.password}

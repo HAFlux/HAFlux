@@ -1,10 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { CryptoService } from './crypto.service';
-import { CloudflareDnsProvider } from './cloudflare.provider';
-import { AcmeService } from './acme.service';
 import { AppException, ErrorCode } from '../common/errors';
-import { certCovers } from '../common/san-match';
+import type { PrismaService } from '../prisma/prisma.service';
+import type { AcmeService } from './acme.service';
+import type { CloudflareDnsProvider } from './cloudflare.provider';
+import type { CryptoService } from './crypto.service';
 
 @Injectable()
 export class CertificatesService {
@@ -75,8 +74,7 @@ export class CertificatesService {
   async deleteProvider(id: string) {
     const orgId = await this.defaultOrgId();
     const p = await this.prisma.dnsProvider.findFirst({ where: { id, orgId } });
-    if (!p)
-      throw new AppException(ErrorCode.PROVIDER_NOT_FOUND, 'Provider not found', 404);
+    if (!p) throw new AppException(ErrorCode.PROVIDER_NOT_FOUND, 'Provider not found', 404);
     await this.prisma.dnsProvider.delete({ where: { id } });
     return { ok: true };
   }

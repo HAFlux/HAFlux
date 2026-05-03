@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import type { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class BackendsService {
@@ -18,8 +18,22 @@ export class BackendsService {
     input: {
       name: string;
       mode: 'http' | 'tcp';
-      balance?: 'roundrobin' | 'static_rr' | 'leastconn' | 'source' | 'uri' | 'url_param' | 'hdr' | 'random';
-      servers?: Array<{ name: string; address: string; port: number; weight?: number; check?: boolean }>;
+      balance?:
+        | 'roundrobin'
+        | 'static_rr'
+        | 'leastconn'
+        | 'source'
+        | 'uri'
+        | 'url_param'
+        | 'hdr'
+        | 'random';
+      servers?: Array<{
+        name: string;
+        address: string;
+        port: number;
+        weight?: number;
+        check?: boolean;
+      }>;
       options?: Record<string, unknown>;
       timeouts?: Record<string, string>;
       httpCheck?: { uri?: string; method?: string; expectStatus?: string };
@@ -51,7 +65,9 @@ export class BackendsService {
   }
 
   async remove(clusterId: string, name: string) {
-    const b = await this.prisma.backend.findUnique({ where: { clusterId_name: { clusterId, name } } });
+    const b = await this.prisma.backend.findUnique({
+      where: { clusterId_name: { clusterId, name } },
+    });
     if (!b) throw new NotFoundException('Backend not found');
     await this.prisma.backend.delete({ where: { id: b.id } });
     return { ok: true };

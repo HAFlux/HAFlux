@@ -1,5 +1,5 @@
-import type { ApiErrorBody, ErrorCode, LoginRequest, LoginResponse } from '@haflux/contracts';
 import { setToken } from '@/lib/auth';
+import type { ApiErrorBody, ErrorCode, LoginRequest, LoginResponse } from '@haflux/contracts';
 
 const API_BASE = '/api/v1';
 
@@ -265,7 +265,11 @@ export const api = {
         }),
       create: (
         clusterId: string,
-        input: { name: string; ipAllowlist: string[]; users: { username: string; password: string }[] },
+        input: {
+          name: string;
+          ipAllowlist: string[];
+          users: { username: string; password: string }[];
+        },
       ) =>
         request<{ id: string }>(`/clusters/${clusterId}/access-groups`, {
           method: 'POST',
@@ -397,23 +401,25 @@ export const api = {
       }),
 
     logs: (id: string) =>
-      request<{
-        time: string;
-        clientIp: string;
-        clientPort: number;
-        frontend: string;
-        backend: string;
-        server: string;
-        status: number;
-        bytes: number;
-        method: string;
-        url: string;
-        path: string;
-        durationMs: number;
-        backendMs: number;
-        termState: string;
-        userAgent: string;
-      }[]>(`/proxy-hosts/${id}/logs`, { auth: true }),
+      request<
+        {
+          time: string;
+          clientIp: string;
+          clientPort: number;
+          frontend: string;
+          backend: string;
+          server: string;
+          status: number;
+          bytes: number;
+          method: string;
+          url: string;
+          path: string;
+          durationMs: number;
+          backendMs: number;
+          termState: string;
+          userAgent: string;
+        }[]
+      >(`/proxy-hosts/${id}/logs`, { auth: true }),
 
     stats: (id: string) =>
       request<{
@@ -445,7 +451,7 @@ export const api = {
       return { blob, filename };
     },
     restore: (payload: unknown) =>
-      request<{ restored: Record<string, number> }>(`/backup/restore`, {
+      request<{ restored: Record<string, number> }>('/backup/restore', {
         method: 'POST',
         body: JSON.stringify(payload),
         auth: true,

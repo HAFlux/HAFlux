@@ -21,9 +21,6 @@ export function sanMatches(san: string, domain: string): boolean {
 }
 
 /** Покрывает ли сертификат указанный домен (по CN или любому SAN). */
-export function certCovers(
-  cert: { commonName: string; sans: string[] },
-  domain: string,
-): boolean {
+export function certCovers(cert: { commonName: string; sans: string[] }, domain: string): boolean {
   return sanMatches(cert.commonName, domain) || cert.sans.some((s) => sanMatches(s, domain));
 }

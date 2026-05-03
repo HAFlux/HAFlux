@@ -1,5 +1,5 @@
-import { type FC, useState, useEffect, useCallback } from 'react';
-import { SunFilledIcon, MoonFilledIcon } from '@/components/icons';
+import { MoonFilledIcon, SunFilledIcon } from '@/components/icons';
+import { type FC, useCallback, useEffect, useState } from 'react';
 
 export interface ThemeSwitchProps {
   className?: string;

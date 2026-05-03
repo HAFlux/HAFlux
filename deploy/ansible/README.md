@@ -4,7 +4,7 @@
 
 ## Что разворачивается
 
-- **control_plane** (один или несколько хостов) — Postgres, Redis, api (NestJS), web (nginx + SPA), HAProxy балансировщик панели.
+- **control_plane** (один или несколько хостов) — Postgres, Redis, api (NestJS, образ из `ghcr.io/haflux/api` со встроенным SPA), HAProxy балансировщик панели.
 - **haproxy_nodes** — только контейнер `haproxy:3.1.17-alpine`. Никакого custom‑агента: панель управляет нодой по SSH (SFTP для файлов + ssh‑exec для validate/reload).
 
 ## Подготовка

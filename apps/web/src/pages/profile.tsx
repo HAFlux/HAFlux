@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { PageHeader } from '@/components/page-header';
-import { api, ApiError } from '@/lib/api';
+import { ApiError, api } from '@/lib/api';
 
 export default function ProfilePage() {
   const { t } = useTranslation();
@@ -51,8 +51,7 @@ export default function ProfilePage() {
     (email !== meQ.data.email ||
       displayName !== (meQ.data.displayName ?? '') ||
       newPassword.length > 0);
-  const canSubmit =
-    !!currentPassword && hasChanges && !passMismatch && !passTooShort;
+  const canSubmit = !!currentPassword && hasChanges && !passMismatch && !passTooShort;
 
   return (
     <div className="flex flex-col gap-8">
@@ -199,11 +198,7 @@ export default function ProfilePage() {
             >
               {t('profile.reset')}
             </button>
-            <button
-              type="submit"
-              className="cyber-btn"
-              disabled={!canSubmit || update.isPending}
-            >
+            <button type="submit" className="cyber-btn" disabled={!canSubmit || update.isPending}>
               {update.isPending ? t('actions.saving') : t('profile.saveChanges')}
             </button>
           </div>

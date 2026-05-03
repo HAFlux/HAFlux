@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { Node } from '@prisma/client';
+import type { PrismaService } from '../../prisma/prisma.service';
 import { LocalTransport } from './local.transport';
 import { SshTransport } from './ssh.transport';
 import type { NodeTransport } from './transport.interface';
-import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class TransportFactory {

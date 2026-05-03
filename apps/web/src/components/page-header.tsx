@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
 import { TerminalTypewriter } from '@/components/terminal-typewriter';
+import type { ReactNode } from 'react';
 
 export function PageHeader({
   kicker,

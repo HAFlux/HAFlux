@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service';
+import type { PrismaService } from '../../prisma/prisma.service';
 import type { RenderedTree } from '../types';
 
 /**
@@ -36,7 +36,12 @@ export class CfgRenderer {
         global: true,
         defaults: { orderBy: { name: 'asc' } },
         frontends: {
-          include: { binds: { include: { cert: true } }, acls: true, httpRules: true, tcpRules: true },
+          include: {
+            binds: { include: { cert: true } },
+            acls: true,
+            httpRules: true,
+            tcpRules: true,
+          },
           orderBy: { name: 'asc' },
         },
         backends: {
@@ -67,18 +72,27 @@ export class CfgRenderer {
 
     files.set('haproxy.cfg', this.renderMain(cluster));
 
-    if (cluster.resolvers.length) files.set('conf.d/10-resolvers.cfg', this.renderResolvers(cluster.resolvers));
-    if (cluster.userlists.length) files.set('conf.d/20-userlists.cfg', this.renderUserlists(cluster.userlists));
-    if (cluster.frontends.length) files.set('conf.d/30-frontends.cfg', this.renderFrontends(cluster.frontends));
-    if (cluster.backends.length) files.set('conf.d/40-backends.cfg', this.renderBackends(cluster.backends));
-    if (cluster.listens.length) files.set('conf.d/50-listen.cfg', this.renderListens(cluster.listens));
+    if (cluster.resolvers.length)
+      files.set('conf.d/10-resolvers.cfg', this.renderResolvers(cluster.resolvers));
+    if (cluster.userlists.length)
+      files.set('conf.d/20-userlists.cfg', this.renderUserlists(cluster.userlists));
+    if (cluster.frontends.length)
+      files.set('conf.d/30-frontends.cfg', this.renderFrontends(cluster.frontends));
+    if (cluster.backends.length)
+      files.set('conf.d/40-backends.cfg', this.renderBackends(cluster.backends));
+    if (cluster.listens.length)
+      files.set('conf.d/50-listen.cfg', this.renderListens(cluster.listens));
     if (cluster.peers.length) files.set('conf.d/60-peers.cfg', this.renderPeers(cluster.peers));
-    if (cluster.httpErrors.length) files.set('conf.d/70-http-errors.cfg', this.renderHttpErrors(cluster.httpErrors));
+    if (cluster.httpErrors.length)
+      files.set('conf.d/70-http-errors.cfg', this.renderHttpErrors(cluster.httpErrors));
     if (cluster.rings.length) files.set('conf.d/80-rings.cfg', this.renderRings(cluster.rings));
     if (cluster.caches.length) files.set('conf.d/85-caches.cfg', this.renderCaches(cluster.caches));
 
     for (const map of cluster.maps) {
-      files.set(`maps/${map.name}.map`, this.renderMapEntries(map.entries as Array<{ key: string; value: string }>));
+      files.set(
+        `maps/${map.name}.map`,
+        this.renderMapEntries(map.entries as Array<{ key: string; value: string }>),
+      );
     }
     for (const acl of cluster.aclLists) {
       files.set(`acl/${acl.name}.lst`, this.renderAclList(acl.entries as string[]));
@@ -132,11 +146,13 @@ export class CfgRenderer {
     if (g.masterCliSocket) {
       lines.push(`  stats socket ${g.masterCliSocket} mode 0660 level admin expose-fd listeners`);
     }
-    if (g.sslDefaultBindCiphers) lines.push(`  ssl-default-bind-ciphers ${g.sslDefaultBindCiphers}`);
+    if (g.sslDefaultBindCiphers)
+      lines.push(`  ssl-default-bind-ciphers ${g.sslDefaultBindCiphers}`);
     if (g.sslDefaultBindCiphersuites) {
       lines.push(`  ssl-default-bind-ciphersuites ${g.sslDefaultBindCiphersuites}`);
     }
-    if (g.sslDefaultBindOptions) lines.push(`  ssl-default-bind-options ${g.sslDefaultBindOptions}`);
+    if (g.sslDefaultBindOptions)
+      lines.push(`  ssl-default-bind-options ${g.sslDefaultBindOptions}`);
     if (g.sslDhParamFile) lines.push(`  ssl-dh-param-file ${g.sslDhParamFile}`);
 
     const tune = (g.tune as Record<string, string | number | boolean> | null) ?? {};
@@ -145,7 +161,12 @@ export class CfgRenderer {
     }
 
     const logTargets =
-      (g.logTargets as Array<{ address: string; format?: string; facility?: string; level?: string }> | null) ?? [];
+      (g.logTargets as Array<{
+        address: string;
+        format?: string;
+        facility?: string;
+        level?: string;
+      }> | null) ?? [];
     for (const lt of logTargets) {
       const parts = [`  log ${lt.address}`];
       if (lt.format) parts.push(`format ${lt.format}`);
@@ -173,7 +194,11 @@ export class CfgRenderer {
       else lines.push(`  option ${k} ${v}`);
     }
 
-    const timeouts = (def.timeouts as Record<string, string> | null) ?? { connect: '5s', client: '30s', server: '30s' };
+    const timeouts = (def.timeouts as Record<string, string> | null) ?? {
+      connect: '5s',
+      client: '30s',
+      server: '30s',
+    };
     for (const [k, v] of Object.entries(timeouts)) lines.push(`  timeout ${k} ${v}`);
 
     const errorfile = (def.errorfile as Record<string, string> | null) ?? {};
@@ -233,10 +258,15 @@ export class CfgRenderer {
       const timeouts = (b.timeouts as Record<string, string> | null) ?? {};
       for (const [k, v] of Object.entries(timeouts)) lines.push(`  timeout ${k} ${v}`);
 
-      const httpCheck = b.httpCheck as { uri?: string; method?: string; expectStatus?: string } | null;
+      const httpCheck = b.httpCheck as {
+        uri?: string;
+        method?: string;
+        expectStatus?: string;
+      } | null;
       if (b.mode === 'http' && httpCheck) {
         lines.push(`  option httpchk ${httpCheck.method ?? 'GET'} ${httpCheck.uri ?? '/'}`);
-        if (httpCheck.expectStatus) lines.push(`  http-check expect status ${httpCheck.expectStatus}`);
+        if (httpCheck.expectStatus)
+          lines.push(`  http-check expect status ${httpCheck.expectStatus}`);
       }
       const tcpCheck = b.tcpCheck as { connect?: boolean; send?: string; expect?: string } | null;
       if (b.mode === 'tcp' && tcpCheck) {
@@ -314,9 +344,15 @@ export class CfgRenderer {
       const lines: string[] = [`userlist ${u.name}`];
       const groups = (u.groups as Array<{ name: string; users?: string[] }>) ?? [];
       for (const g of groups) {
-        lines.push(`  group ${g.name}${g.users ? ' users ' + g.users.join(',') : ''}`);
+        lines.push(`  group ${g.name}${g.users ? ` users ${g.users.join(',')}` : ''}`);
       }
-      const users = (u.users as Array<{ name: string; password?: string; insecurePassword?: string; groups?: string[] }>) ?? [];
+      const users =
+        (u.users as Array<{
+          name: string;
+          password?: string;
+          insecurePassword?: string;
+          groups?: string[];
+        }>) ?? [];
       for (const usr of users) {
         const parts = [`  user ${usr.name}`];
         if (usr.password) parts.push(`password ${usr.password}`);
@@ -353,7 +389,9 @@ export class CfgRenderer {
       if (r.description) lines.push(`  description "${r.description}"`);
       if (r.format) lines.push(`  format ${r.format}`);
       lines.push(`  size ${r.size}`);
-      const servers = (r.servers as Array<{ name: string; address: string; port: number; options?: string }>) ?? [];
+      const servers =
+        (r.servers as Array<{ name: string; address: string; port: number; options?: string }>) ??
+        [];
       for (const s of servers) {
         const parts = [`  server ${s.name} ${s.address}:${s.port}`];
         if (s.options) parts.push(s.options);
@@ -426,9 +464,7 @@ export class CfgRenderer {
     }
     const conditions = (r.conditions as Array<{ acl: string; invert?: boolean }> | null) ?? [];
     if (conditions.length) {
-      const ifClause = conditions
-        .map((c) => (c.invert ? `!${c.acl}` : c.acl))
-        .join(' ');
+      const ifClause = conditions.map((c) => (c.invert ? `!${c.acl}` : c.acl)).join(' ');
       parts.push(`if ${ifClause}`);
     }
     return parts.join(' ');
@@ -453,11 +489,11 @@ export class CfgRenderer {
   }
 
   private renderMapEntries(entries: Array<{ key: string; value: string }>): string {
-    return entries.map((e) => `${e.key} ${e.value}`).join('\n') + '\n';
+    return `${entries.map((e) => `${e.key} ${e.value}`).join('\n')}\n`;
   }
 
   private renderAclList(entries: string[]): string {
-    return entries.join('\n') + '\n';
+    return `${entries.join('\n')}\n`;
   }
 
   private renderSpoeAgent(spoe: ClusterWithIncludes['spoeAgents'][number]): string {
@@ -470,7 +506,7 @@ export class CfgRenderer {
       lines.push(`${k} = ${typeof v === 'object' ? JSON.stringify(v) : String(v)}`);
     }
     if (spoe.rawExtra) lines.push(spoe.rawExtra);
-    return lines.join('\n') + '\n';
+    return `${lines.join('\n')}\n`;
   }
 }
 
@@ -493,7 +529,9 @@ type ClusterWithIncludes = Prisma.ClusterGetPayload<{
   include: {
     global: true;
     defaults: true;
-    frontends: { include: { binds: { include: { cert: true } }; acls: true; httpRules: true; tcpRules: true } };
+    frontends: {
+      include: { binds: { include: { cert: true } }; acls: true; httpRules: true; tcpRules: true };
+    };
     backends: { include: { servers: true; acls: true; httpRules: true; tcpRules: true } };
     listens: { include: { binds: { include: { cert: true } }; servers: true } };
     peers: true;

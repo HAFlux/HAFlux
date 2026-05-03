@@ -9,20 +9,8 @@ updates:
       heroui: { patterns: ["@heroui/*"] }
       tanstack: { patterns: ["@tanstack/*"] }
 
-  - package-ecosystem: gomod
-    directory: /apps/agent
-    schedule: { interval: weekly }
-
   - package-ecosystem: docker
     directory: /apps/api
-    schedule: { interval: weekly }
-
-  - package-ecosystem: docker
-    directory: /apps/web
-    schedule: { interval: weekly }
-
-  - package-ecosystem: docker
-    directory: /apps/agent
     schedule: { interval: weekly }
 
   - package-ecosystem: github-actions

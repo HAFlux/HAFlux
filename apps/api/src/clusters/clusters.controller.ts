@@ -10,14 +10,17 @@ import {
   Put,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
-import { ClustersService } from './clusters.service';
-import { AccessGroupsService } from './access-groups.service';
-import { ClusterErrorFilesService, parseClusterErrorPageCode } from './cluster-error-files.service';
 import { ErrorCode } from '../common/errors';
 import { zodToAppException } from '../common/zod-to-error';
+import type { AccessGroupsService } from './access-groups.service';
+import {
+  type ClusterErrorFilesService,
+  parseClusterErrorPageCode,
+} from './cluster-error-files.service';
+import type { ClustersService } from './clusters.service';
 
 const ErrorPageHtmlSchema = z.object({
   html: z.string().min(1, 'html is required').max(512_000, 'html is too large'),

@@ -1,6 +1,6 @@
+import { type ChildProcess, spawn } from 'node:child_process';
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { spawn, type ChildProcess } from 'node:child_process';
+import type { ConfigService } from '@nestjs/config';
 
 /**
  * Парсер HAProxy httplog access-log строк.
@@ -136,13 +136,13 @@ export class HaproxyLogsService implements OnModuleInit, OnModuleDestroy {
     if (!backend.startsWith('be_proxy_')) return;
     const hostId = backend.slice('be_proxy_'.length);
 
-    const status = parseInt(g.status ?? '', 10);
+    const status = Number.parseInt(g.status ?? '', 10);
     if (Number.isNaN(status)) return;
 
     // Timers: 'Tq/Tw/Tc/Tr/Tt' — берём Tr и Tt
     const timers = (g.timers ?? '').split('/');
-    const backendMs = parseInt(timers[3] ?? '0', 10) || 0;
-    const durationMs = parseInt(timers[4] ?? '0', 10) || 0;
+    const backendMs = Number.parseInt(timers[3] ?? '0', 10) || 0;
+    const durationMs = Number.parseInt(timers[4] ?? '0', 10) || 0;
 
     // Path: если URL — абсолютный (https://..), берём от первого '/' после хоста.
     const url = g.url ?? '';
@@ -153,12 +153,12 @@ export class HaproxyLogsService implements OnModuleInit, OnModuleDestroy {
     const entry: LogEntry = {
       time: g.time ?? '',
       clientIp: g.clientIp ?? '',
-      clientPort: parseInt(g.clientPort ?? '0', 10) || 0,
+      clientPort: Number.parseInt(g.clientPort ?? '0', 10) || 0,
       frontend: g.frontend ?? '',
       backend,
       server: g.server ?? '',
       status,
-      bytes: parseInt(g.bytes ?? '0', 10) || 0,
+      bytes: Number.parseInt(g.bytes ?? '0', 10) || 0,
       method: g.method ?? '',
       url,
       path: pathOnly,

@@ -1,8 +1,8 @@
 import path from 'node:path';
 import { Logger } from '@nestjs/common';
 import type { Node } from '@prisma/client';
-import type { NodeTransport } from './transport.interface';
 import type { RenderedTree } from '../types';
+import type { NodeTransport } from './transport.interface';
 
 /**
  * Транспорт для удалённых нод по SSH/SFTP.

@@ -104,8 +104,9 @@
     force: false
     content: |
       # Bootstrap haproxy.cfg — будет перезаписан HAFlux панелью при первом
-      # Apply. До этого момента HAProxy сам выступает входной точкой для
-      # панели: /api/* → api:3000, всё остальное → web (nginx со статикой).
+      # Apply. До этого момента HAProxy выступает входной точкой панели и
+      # проксирует и REST (/api/*), и SPA на api контейнер (он сам отдаёт
+      # статику Vite-build из /app/public).
       global
         maxconn 4000
         log stdout local0 info
@@ -120,7 +121,7 @@
         timeout server  60s
 
       frontend fe_panel
-        bind *:80
+        bind *:{{ haflux_web_port }}
         default_backend be_panel
 
       backend be_panel
@@ -150,13 +151,6 @@
   community.general.ufw:
     rule: allow
     port: "{{ haflux_web_port }}"
-    proto: tcp
-  when: haflux_enable_ufw | default(false)
-
-- name: Open API port in firewall (для агентов на других машинах)
-  community.general.ufw:
-    rule: allow
-    port: "{{ haflux_api_port }}"
     proto: tcp
   when: haflux_enable_ufw | default(false)
 

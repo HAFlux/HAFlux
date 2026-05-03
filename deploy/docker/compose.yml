@@ -1,10 +1,14 @@
-# HPM — single-host docker compose (demo / self-host).
+# HAFlux — single-host docker compose (demo / self-host).
 #
 # Архитектура: panel = api контейнер (NestJS + Fastify), который сам отдаёт
 # и REST (/api/v1/*), и SPA (статика Vite-build из /app/public). Никакого
 # nginx — всё проксируется через сам HAProxy. api пишет haproxy.cfg в
 # ./haproxy-data/, haproxy монтирует это дерево read-only. Reload через
 # docker kill -s USR2 haproxy-balancer.
+#
+# По умолчанию api тянется готовым из ghcr.io/haflux/api:${HAFLUX_API_TAG:-latest}.
+# Чтобы собрать локально из исходников вместо pull:
+#   docker compose -f compose.yml --env-file .env up -d --build
 
 services:
   db:
@@ -32,10 +36,10 @@ services:
     networks: [internal]
 
   api:
+    image: ${HAFLUX_API_IMAGE:-ghcr.io/haflux/api:${HAFLUX_API_TAG:-latest}}
     build:
       context: ../..
       dockerfile: apps/api/Dockerfile
-    image: haflux/api:dev
     restart: unless-stopped
     environment:
       NODE_ENV: production

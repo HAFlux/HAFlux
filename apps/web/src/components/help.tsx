@@ -8,7 +8,14 @@ export function Help({ text }: HelpProps) {
       <button
         type="button"
         className="cyber-mono cursor-help border text-[11px] leading-none transition-colors hover:border-[var(--color-fg)] hover:text-[var(--color-fg)]"
-        style={{ borderColor: 'var(--color-separator)', color: 'var(--color-muted)', width: 18, height: 18, borderRadius: 2, padding: 0 }}
+        style={{
+          borderColor: 'var(--color-separator)',
+          color: 'var(--color-muted)',
+          width: 18,
+          height: 18,
+          borderRadius: 2,
+          padding: 0,
+        }}
         aria-label={text}
         tabIndex={0}
       >

@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Help } from '@/components/help';
+import { Modal } from '@/components/modal';
 import { PageHeader } from '@/components/page-header';
 import { PanelLoader } from '@/components/panel-loader';
-import { api, ApiError } from '@/lib/api';
-import { Modal } from '@/components/modal';
+import { ApiError, api } from '@/lib/api';
 
 type ClusterMode = 'STANDALONE' | 'ACTIVE_PASSIVE' | 'ACTIVE_ACTIVE';
 const MODE_VALUES: ClusterMode[] = ['STANDALONE', 'ACTIVE_PASSIVE', 'ACTIVE_ACTIVE'];
@@ -268,7 +268,6 @@ function CreateClusterModal({
           </span>
           <input
             className="cyber-input"
-            autoFocus
             placeholder="prod-edge"
             value={name}
             onBlur={() => setTouched(true)}
@@ -426,7 +425,6 @@ function EditClusterModal({
           </span>
           <input
             className="cyber-input"
-            autoFocus
             value={name}
             onBlur={() => setTouched(true)}
             onChange={(e) => setName(e.target.value)}

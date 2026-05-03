@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import type { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class FrontendsService {
@@ -40,7 +40,9 @@ export class FrontendsService {
   }
 
   async remove(clusterId: string, name: string) {
-    const f = await this.prisma.frontend.findUnique({ where: { clusterId_name: { clusterId, name } } });
+    const f = await this.prisma.frontend.findUnique({
+      where: { clusterId_name: { clusterId, name } },
+    });
     if (!f) throw new NotFoundException('Frontend not found');
     await this.prisma.frontend.delete({ where: { id: f.id } });
     return { ok: true };

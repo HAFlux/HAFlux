@@ -1,6 +1,6 @@
-import { type ArgumentsHost, Catch, type ExceptionFilter, NotFoundException } from '@nestjs/common';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
+import { type ArgumentsHost, Catch, type ExceptionFilter, NotFoundException } from '@nestjs/common';
 
 /**
  * SPA fallback: любой GET-запрос, которого нет в Nest-роутах и не /api/* /

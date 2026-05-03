@@ -1,5 +1,9 @@
 # HAFlux
 
+[![CI](https://github.com/HAFlux/HAFlux/actions/workflows/ci.yml/badge.svg)](https://github.com/HAFlux/HAFlux/actions/workflows/ci.yml)
+[![Release](https://github.com/HAFlux/HAFlux/actions/workflows/release.yml/badge.svg)](https://github.com/HAFlux/HAFlux/actions/workflows/release.yml)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
+
 Multi‑HAProxy control plane: визуальное управление одной или несколькими инсталляциями HAProxy через Data Plane API.
 
 > Аналоги по идее — **Nginx Proxy Manager**, **BunkerWeb**, **Roxy‑WI**.
@@ -14,35 +18,35 @@ Multi‑HAProxy control plane: визуальное управление одн�
 - **HAProxy** — официальный образ `haproxy:3.x-alpine`, master‑worker, host network, без custom‑бинарей сверху.
 - **Deploy** — `docker compose` для одной машины и **Ansible** (`deploy/ansible/`) для multi‑node инсталляций.
 
-## Быстрый старт (демо, одна нода)
+## Быстрый старт (Docker Compose, одна нода)
+
+API-образ публикуется на каждом теге `v*.*.*` в `ghcr.io/haflux/api`. По умолчанию compose тянет
+`:latest`; сборка из исходников не нужна.
 
 ```bash
-git clone https://github.com/haflux/haflux.git
-cd haflux
+git clone https://github.com/HAFlux/HAFlux.git
+cd HAFlux
 cp deploy/docker/env.example deploy/docker/.env
-./deploy/docker/scripts/init-secrets.sh   # сгенерирует JWT_SECRET, ENCRYPTION_KEY, DB_PASSWORD
-docker compose -f deploy/docker/compose.yml --env-file deploy/docker/.env up -d --build
+./deploy/docker/scripts/init-secrets.sh         # JWT_SECRET, ENCRYPTION_KEY, DB_PASSWORD
+docker compose -f deploy/docker/compose.yml --env-file deploy/docker/.env up -d
 ```
 
-UI откроется на `http://localhost:8080`. Дефолтный логин выводится в логах `api` контейнера при первом старте.
+UI: <http://localhost:8080> (HAProxy фронт), напрямую API: <http://localhost:3000/api/v1>.
+Дефолтный логин (или сгенерированный пароль) выводится в логах `api` при первом старте:
 
-## Структура репозитория
+```bash
+docker compose -f deploy/docker/compose.yml --env-file deploy/docker/.env logs api | grep -i bootstrap
+```
 
-```
-haflux/
-├── apps/
-│   ├── api/          # NestJS backend (модуль haproxy: render + transports)
-│   └── web/          # Vite + React UI
-├── packages/
-│   └── contracts/    # Общие Zod-схемы и типы
-├── deploy/
-│   ├── docker/       # docker compose + haproxy-data/
-│   └── ansible/      # bootstrap control-plane и нод
-├── docs/             # SPEC.md, ADR, инструкции
-└── .github/          # CI и шаблоны issues/PR
-```
+Чтобы зафиксировать конкретный релиз — поставьте `HAFLUX_API_TAG=v0.1.0` в `.env`.
+Чтобы собрать API локально из исходников — добавьте `--build` к `docker compose up`.
+
+Полные опции и dev-режим — в [`deploy/docker/README.md`](deploy/docker/README.md).
 
 ## Multi‑node через Ansible
+
+Control‑plane на одной машине, HAProxy‑ноды на остальных. Управление нодами — по SSH (SFTP +
+ssh‑exec), без custom‑агента.
 
 ```bash
 ansible-galaxy install -r deploy/ansible/requirements.yml
@@ -51,7 +55,50 @@ $EDITOR deploy/ansible/inventory/hosts.ini
 ansible-playbook -i deploy/ansible/inventory/hosts.ini deploy/ansible/site.yml
 ```
 
-Подробности — [`deploy/ansible/README.md`](deploy/ansible/README.md).
+Подробности и переменные — в [`deploy/ansible/README.md`](deploy/ansible/README.md).
+
+## Структура репозитория
+
+```
+HAFlux/
+├── apps/
+│   ├── api/          # NestJS backend, бандлит SPA в /app/public (Fastify static)
+│   └── web/          # Vite + React UI (билдится в apps/api/Dockerfile)
+├── packages/
+│   └── contracts/    # Общие Zod‑схемы и типы (api ↔ web)
+├── deploy/
+│   ├── docker/       # docker compose + haproxy-data/ (single-host)
+│   └── ansible/      # роли control_plane / haproxy_node + playbooks
+├── docs/             # SPEC.md, ADR
+└── .github/
+    ├── workflows/    # ci.yml, release.yml, codeql.yml
+    └── ISSUE_TEMPLATE/
+```
+
+## CI/CD
+
+| Workflow | Триггер | Что делает |
+|---|---|---|
+| `ci.yml` | push в `main`, любой PR | install → prisma generate → contracts build → biome lint → tsc typecheck → vitest → pnpm build → docker build (smoke) с GHA-кэшем |
+| `release.yml` | push тега `v*.*.*` | multi-arch (`amd64`/`arm64`) сборка api образа, push в `ghcr.io/haflux/api` со всеми семвер-тегами + `latest`, GitHub Release с авто-changelog |
+| `codeql.yml` | push в `main`, PR в `main`, weekly cron | CodeQL для TypeScript |
+
+### Релиз
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+GitHub Actions соберёт и опубликует:
+
+- `ghcr.io/haflux/api:v0.1.0`
+- `ghcr.io/haflux/api:0.1.0`
+- `ghcr.io/haflux/api:0.1`
+- `ghcr.io/haflux/api:0`
+- `ghcr.io/haflux/api:latest`
+
+И создаст GitHub Release с авто‑сгенерированными release notes по PR с прошлого тега.
 
 ## Разработка
 
@@ -59,10 +106,12 @@ ansible-playbook -i deploy/ansible/inventory/hosts.ini deploy/ansible/site.yml
 
 ```bash
 pnpm install
-pnpm dev          # api + web в watch-режиме
-pnpm lint
-pnpm typecheck
-pnpm test
+pnpm --filter @haflux/contracts build   # один раз — для алиасов в api/web
+pnpm dev                                # api + web в watch-режиме
+pnpm lint                               # biome
+pnpm typecheck                          # tsc --noEmit во всех пакетах
+pnpm test                               # vitest run во всех пакетах
+pnpm build                              # production build всех пакетов
 ```
 
 ## Дорожная карта

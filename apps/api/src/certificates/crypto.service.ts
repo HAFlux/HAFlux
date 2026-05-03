@@ -1,6 +1,6 @@
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import { Injectable, type OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'node:crypto';
+import type { ConfigService } from '@nestjs/config';
 
 /**
  * Envelope encryption через AES-256-GCM ключом из ENCRYPTION_KEY.

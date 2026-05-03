@@ -1,10 +1,10 @@
+import { exec } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { Node } from '@prisma/client';
-import type { NodeTransport } from './transport.interface';
 import type { RenderedTree } from '../types';
+import type { NodeTransport } from './transport.interface';
 
 const execAsync = promisify(exec);
 

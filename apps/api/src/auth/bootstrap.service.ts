@@ -1,8 +1,8 @@
-import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'node:crypto';
-import { PrismaService } from '../prisma/prisma.service';
-import { AuthService } from './auth.service';
+import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import type { ConfigService } from '@nestjs/config';
+import type { PrismaService } from '../prisma/prisma.service';
+import type { AuthService } from './auth.service';
 
 /**
  * При первом старте api создаём:
@@ -32,7 +32,9 @@ export class BootstrapService implements OnModuleInit {
   }
 
   private async bootstrap(): Promise<void> {
-    const email = (this.cfg.get<string>('BOOTSTRAP_ROOT_EMAIL') ?? 'admin@haflux.local').toLowerCase();
+    const email = (
+      this.cfg.get<string>('BOOTSTRAP_ROOT_EMAIL') ?? 'admin@haflux.local'
+    ).toLowerCase();
 
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) {

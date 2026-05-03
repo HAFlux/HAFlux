@@ -1,7 +1,7 @@
 import { Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
-import { ApplyService } from './apply.service';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import type { ApplyService } from './apply.service';
 
 @ApiTags('haproxy:apply')
 @ApiBearerAuth()

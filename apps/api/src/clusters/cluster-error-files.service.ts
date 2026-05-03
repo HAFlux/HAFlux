@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { ErrorFile } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
 import { AppException, ErrorCode } from '../common/errors';
-import { ProxyHostsRenderApplyService } from '../proxy-hosts/render-apply.service';
+import type { PrismaService } from '../prisma/prisma.service';
+import type { ProxyHostsRenderApplyService } from '../proxy-hosts/render-apply.service';
 
 export const CLUSTER_ERROR_PAGE_CODES = [400, 403, 408, 500, 502, 503, 504] as const;
 
@@ -96,7 +96,10 @@ export class ClusterErrorFilesService {
   }
 
   private async assertCluster(clusterId: string): Promise<void> {
-    const c = await this.prisma.cluster.findUnique({ where: { id: clusterId }, select: { id: true } });
+    const c = await this.prisma.cluster.findUnique({
+      where: { id: clusterId },
+      select: { id: true },
+    });
     if (!c) throw new AppException(ErrorCode.CLUSTER_NOT_FOUND, 'Cluster not found', 404);
   }
 }

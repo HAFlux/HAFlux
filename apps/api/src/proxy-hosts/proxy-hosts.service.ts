@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
 import { AppException, ErrorCode } from '../common/errors';
 import { certCovers } from '../common/san-match';
-import { ProxyHostsRenderApplyService } from './render-apply.service';
+import type { PrismaService } from '../prisma/prisma.service';
+import type { ProxyHostsRenderApplyService } from './render-apply.service';
 
 export interface CreateProxyHostInput {
   clusterId: string;
@@ -139,10 +139,7 @@ export class ProxyHostsService {
     const existing = await this.findOrThrow(id);
     const nextScheme = input.forwardScheme ?? existing.forwardScheme;
     const nextListen = input.listenPort !== undefined ? input.listenPort : existing.listenPort;
-    if (
-      (nextScheme === 'tcp' || nextScheme === 'udp') &&
-      (nextListen == null || nextListen < 1)
-    ) {
+    if ((nextScheme === 'tcp' || nextScheme === 'udp') && (nextListen == null || nextListen < 1)) {
       throw new AppException(
         ErrorCode.VALIDATION_FAILED,
         'listenPort is required for TCP and UDP proxy hosts',
@@ -214,8 +211,7 @@ export class ProxyHostsService {
 
   private async findOrThrow(id: string) {
     const host = await this.prisma.proxyHost.findUnique({ where: { id } });
-    if (!host)
-      throw new AppException(ErrorCode.PROXY_HOST_NOT_FOUND, 'Proxy host not found', 404);
+    if (!host) throw new AppException(ErrorCode.PROXY_HOST_NOT_FOUND, 'Proxy host not found', 404);
     return host;
   }
 
@@ -228,7 +224,9 @@ export class ProxyHostsService {
     T extends {
       accessGroupMemberships: { accessGroup: { id: string; name: string } }[];
     },
-  >(h: T): Omit<T, 'accessGroupMemberships'> & {
+  >(
+    h: T,
+  ): Omit<T, 'accessGroupMemberships'> & {
     accessGroups: { id: string; name: string }[];
   } {
     const { accessGroupMemberships, ...rest } = h;
@@ -249,11 +247,7 @@ export class ProxyHostsService {
       select: { id: true },
     });
     if (found.length !== uniq.length) {
-      throw new AppException(
-        ErrorCode.NOT_FOUND,
-        'Access group not found in this cluster',
-        404,
-      );
+      throw new AppException(ErrorCode.NOT_FOUND, 'Access group not found in this cluster', 404);
     }
   }
 
@@ -298,4 +292,3 @@ export class ProxyHostsService {
     }
   }
 }
-

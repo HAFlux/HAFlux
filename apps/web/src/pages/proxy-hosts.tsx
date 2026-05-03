@@ -1,15 +1,15 @@
 import { ListBox, Select } from '@heroui/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Help } from '@/components/help';
+import { Modal } from '@/components/modal';
 import { PageHeader } from '@/components/page-header';
 import { PanelLoader } from '@/components/panel-loader';
-import { Modal } from '@/components/modal';
 import {
-  ApiError,
   type AccessGroupSummary,
+  ApiError,
   type Certificate,
   type CreateProxyHostInput,
   type ForwardScheme,
@@ -28,7 +28,7 @@ export default function ProxyHostsPage() {
   const [activeClusterId, setActiveClusterId] = useState<string | null>(null);
   useEffect(() => {
     if (!activeClusterId && clusters.length > 0) {
-      setActiveClusterId(clusters[0]!.id);
+      setActiveClusterId(clusters[0]?.id);
     }
   }, [activeClusterId, clusters]);
 
@@ -266,7 +266,9 @@ function ProxyHostRow({
               {target}
             </span>
             {!isL7 && host.listenPort != null ? (
-              <span className="cyber-tag">{t('proxyHosts.tagListen', { port: host.listenPort })}</span>
+              <span className="cyber-tag">
+                {t('proxyHosts.tagListen', { port: host.listenPort })}
+              </span>
             ) : null}
             {host.healthCheckedAt && (
               <span className="cyber-mono text-xs" style={{ color: 'var(--color-muted)' }}>
@@ -282,10 +284,16 @@ function ProxyHostRow({
                 {t('proxyHosts.tagCert', { name: host.certificate.commonName })}
               </span>
             )}
-            {isL7 && host.httpToHttps && <span className="cyber-tag">{t('proxyHosts.tag443')}</span>}
+            {isL7 && host.httpToHttps && (
+              <span className="cyber-tag">{t('proxyHosts.tag443')}</span>
+            )}
             {isL7 && host.hsts && <span className="cyber-tag">{t('proxyHosts.tagHsts')}</span>}
-            {isL7 && host.http2 && host.ssl && <span className="cyber-tag">{t('proxyHosts.tagH2')}</span>}
-            {isL7 && host.http3 && host.ssl && <span className="cyber-tag">{t('proxyHosts.tagH3')}</span>}
+            {isL7 && host.http2 && host.ssl && (
+              <span className="cyber-tag">{t('proxyHosts.tagH2')}</span>
+            )}
+            {isL7 && host.http3 && host.ssl && (
+              <span className="cyber-tag">{t('proxyHosts.tagH3')}</span>
+            )}
             {isL7 && host.wsSupport && <span className="cyber-tag">{t('proxyHosts.tagWs')}</span>}
             {isL7 && host.blockExploits && (
               <span className="cyber-tag">{t('proxyHosts.tagBlockExploits')}</span>
@@ -602,7 +610,9 @@ function headerRowsFromHost(host: ProxyHost): { key: string; value: string }[] {
   return entries.map(([key, value]) => ({ key, value }));
 }
 
-function rowsToCustomHeaders(rows: { key: string; value: string }[]): Record<string, string> | null {
+function rowsToCustomHeaders(
+  rows: { key: string; value: string }[],
+): Record<string, string> | null {
   const out: Record<string, string> = {};
   for (const r of rows) {
     const k = r.key.trim().toLowerCase();
@@ -722,7 +732,7 @@ function ProxyHostFormModal({
   useEffect(() => {
     if (!open || !state.ssl) return;
     if (state.certificateId && matchingCerts.find((c) => c.id === state.certificateId)) return;
-    if (matchingCerts[0]) setState((s) => ({ ...s, certificateId: matchingCerts[0]!.id }));
+    if (matchingCerts[0]) setState((s) => ({ ...s, certificateId: matchingCerts[0]?.id }));
     else setState((s) => ({ ...s, certificateId: null }));
   }, [open, matchingCerts, state.ssl, state.certificateId]);
 
@@ -848,7 +858,6 @@ function ProxyHostFormModal({
           </span>
           <input
             className="cyber-input"
-            autoFocus
             placeholder={t('proxyHosts.domainPlaceholder')}
             value={state.domain}
             onBlur={() => setTouched((prev) => ({ ...prev, domain: true }))}
@@ -1018,7 +1027,10 @@ function ProxyHostFormModal({
                       />
                       <div className="flex min-w-0 flex-col gap-0.5">
                         <span className="cyber-mono break-words text-sm">{g.name}</span>
-                        <span className="cyber-mono text-xs" style={{ color: 'var(--color-muted)' }}>
+                        <span
+                          className="cyber-mono text-xs"
+                          style={{ color: 'var(--color-muted)' }}
+                        >
                           {t('accessGroups.metaLine', {
                             ips: g.ipCount,
                             users: g.userCount,
@@ -1041,106 +1053,106 @@ function ProxyHostFormModal({
         )}
 
         {isL7 && (
-        <div className="flex flex-col gap-3">
-          <span className="cyber-label">{t('proxyHosts.ssl')}</span>
-          <CheckboxRow
-            checked={state.ssl}
-            onChange={(v) => setState((s) => ({ ...s, ssl: v }))}
-            title={t('proxyHosts.enableHttps')}
-            hint={t('proxyHosts.enableHttpsHint')}
-          />
-          {state.ssl && (
-            <>
-              <div className="flex flex-col gap-1.5">
-                <span className="cyber-label">{t('proxyHosts.certificate')}</span>
-                {matchingCerts.length === 0 ? (
-                  <div className="cyber-mono text-xs" style={{ color: 'var(--color-muted)' }}>
-                    {t('proxyHosts.noMatchingCert', {
-                      domain: state.domain || t('proxyHosts.placeholderDomain'),
-                      certificates: t('nav.certificates'),
-                    })}
-                  </div>
-                ) : (
-                  <Select
-                    className="w-full"
-                    fullWidth
-                    placeholder={t('proxyHosts.pickCert')}
-                    selectedKey={state.certificateId ?? '__none__'}
-                    variant="secondary"
-                    onSelectionChange={(key) =>
-                      setState((s) => ({
-                        ...s,
-                        certificateId:
-                          key == null || String(key) === '__none__' ? null : String(key),
-                      }))
-                    }
-                  >
-                    <Select.Trigger className="cyber-input flex min-h-10 w-full items-center justify-between gap-2 text-left font-mono text-sm">
-                      <Select.Value />
-                      <Select.Indicator />
-                    </Select.Trigger>
-                    <Select.Popover className="cyber-popover">
-                      <ListBox>
-                        <ListBox.Item
-                          className="font-mono text-sm"
-                          id="__none__"
-                          textValue={t('proxyHosts.pickCert')}
-                        >
-                          {t('proxyHosts.pickCert')}
-                        </ListBox.Item>
-                        {matchingCerts.map((c) => (
+          <div className="flex flex-col gap-3">
+            <span className="cyber-label">{t('proxyHosts.ssl')}</span>
+            <CheckboxRow
+              checked={state.ssl}
+              onChange={(v) => setState((s) => ({ ...s, ssl: v }))}
+              title={t('proxyHosts.enableHttps')}
+              hint={t('proxyHosts.enableHttpsHint')}
+            />
+            {state.ssl && (
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <span className="cyber-label">{t('proxyHosts.certificate')}</span>
+                  {matchingCerts.length === 0 ? (
+                    <div className="cyber-mono text-xs" style={{ color: 'var(--color-muted)' }}>
+                      {t('proxyHosts.noMatchingCert', {
+                        domain: state.domain || t('proxyHosts.placeholderDomain'),
+                        certificates: t('nav.certificates'),
+                      })}
+                    </div>
+                  ) : (
+                    <Select
+                      className="w-full"
+                      fullWidth
+                      placeholder={t('proxyHosts.pickCert')}
+                      selectedKey={state.certificateId ?? '__none__'}
+                      variant="secondary"
+                      onSelectionChange={(key) =>
+                        setState((s) => ({
+                          ...s,
+                          certificateId:
+                            key == null || String(key) === '__none__' ? null : String(key),
+                        }))
+                      }
+                    >
+                      <Select.Trigger className="cyber-input flex min-h-10 w-full items-center justify-between gap-2 text-left font-mono text-sm">
+                        <Select.Value />
+                        <Select.Indicator />
+                      </Select.Trigger>
+                      <Select.Popover className="cyber-popover">
+                        <ListBox>
                           <ListBox.Item
-                            key={c.id}
                             className="font-mono text-sm"
-                            id={c.id}
-                            textValue={t('proxyHosts.certOption', {
-                              commonName: c.commonName,
-                              sans: c.sans.join(', '),
-                            })}
+                            id="__none__"
+                            textValue={t('proxyHosts.pickCert')}
                           >
-                            {t('proxyHosts.certOption', {
-                              commonName: c.commonName,
-                              sans: c.sans.join(', '),
-                            })}
+                            {t('proxyHosts.pickCert')}
                           </ListBox.Item>
-                        ))}
-                      </ListBox>
-                    </Select.Popover>
-                  </Select>
-                )}
-              </div>
-              <CheckboxRow
-                checked={state.httpToHttps}
-                onChange={(v) => setState((s) => ({ ...s, httpToHttps: v }))}
-                title={t('proxyHosts.forceHttps')}
-                hint={t('proxyHosts.forceHttpsHint')}
-              />
-              <CheckboxRow
-                checked={state.hsts}
-                onChange={(v) => setState((s) => ({ ...s, hsts: v }))}
-                title={t('proxyHosts.hsts')}
-                hint={t('proxyHosts.hstsHint')}
-              />
-              <CheckboxRow
-                checked={state.http2}
-                onChange={(v) => setState((s) => ({ ...s, http2: v }))}
-                title={t('proxyHosts.http2')}
-                hint={t('proxyHosts.http2Hint')}
-              />
-              <CheckboxRow
-                checked={state.http3}
-                onChange={(v) => setState((s) => ({ ...s, http3: v }))}
-                title={
-                  <span className="flex items-center gap-2">
-                    {t('proxyHosts.http3')}
-                    <Help text={t('proxyHosts.helpHttp3')} />
-                  </span>
-                }
-                hint={t('proxyHosts.http3Hint')}
-              />
-            </>
-          )}
-        </div>
+                          {matchingCerts.map((c) => (
+                            <ListBox.Item
+                              key={c.id}
+                              className="font-mono text-sm"
+                              id={c.id}
+                              textValue={t('proxyHosts.certOption', {
+                                commonName: c.commonName,
+                                sans: c.sans.join(', '),
+                              })}
+                            >
+                              {t('proxyHosts.certOption', {
+                                commonName: c.commonName,
+                                sans: c.sans.join(', '),
+                              })}
+                            </ListBox.Item>
+                          ))}
+                        </ListBox>
+                      </Select.Popover>
+                    </Select>
+                  )}
+                </div>
+                <CheckboxRow
+                  checked={state.httpToHttps}
+                  onChange={(v) => setState((s) => ({ ...s, httpToHttps: v }))}
+                  title={t('proxyHosts.forceHttps')}
+                  hint={t('proxyHosts.forceHttpsHint')}
+                />
+                <CheckboxRow
+                  checked={state.hsts}
+                  onChange={(v) => setState((s) => ({ ...s, hsts: v }))}
+                  title={t('proxyHosts.hsts')}
+                  hint={t('proxyHosts.hstsHint')}
+                />
+                <CheckboxRow
+                  checked={state.http2}
+                  onChange={(v) => setState((s) => ({ ...s, http2: v }))}
+                  title={t('proxyHosts.http2')}
+                  hint={t('proxyHosts.http2Hint')}
+                />
+                <CheckboxRow
+                  checked={state.http3}
+                  onChange={(v) => setState((s) => ({ ...s, http3: v }))}
+                  title={
+                    <span className="flex items-center gap-2">
+                      {t('proxyHosts.http3')}
+                      <Help text={t('proxyHosts.helpHttp3')} />
+                    </span>
+                  }
+                  hint={t('proxyHosts.http3Hint')}
+                />
+              </>
+            )}
+          </div>
         )}
 
         <div className="flex flex-col gap-3">
@@ -1179,7 +1191,10 @@ function ProxyHostFormModal({
             </span>
             <div className="flex flex-col gap-2">
               {state.customHeaderRows.map((row, idx) => (
-                <div key={idx} className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_1fr_auto] md:items-end">
+                <div
+                  key={idx}
+                  className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_1fr_auto] md:items-end"
+                >
                   <label className="flex flex-col gap-1">
                     <span className="cyber-mono text-xs" style={{ color: 'var(--color-muted)' }}>
                       {t('proxyHosts.headerName')}
@@ -1351,16 +1366,14 @@ function formatHaproxyTime(t: string): string {
   const d = new Date(Date.UTC(+m[3]!, mo, +m[1]!, +m[4]!, +m[5]!, +m[6]!, +(m[7] ?? 0)));
   if (Number.isNaN(d.getTime())) return t;
   const ms = String(d.getMilliseconds()).padStart(3, '0');
-  return (
-    d.toLocaleString(undefined, {
-      year: '2-digit',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    }) + `.${ms}`
-  );
+  return `${d.toLocaleString(undefined, {
+    year: '2-digit',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })}.${ms}`;
 }
 
 function sanMatches(san: string, domain: string): boolean {

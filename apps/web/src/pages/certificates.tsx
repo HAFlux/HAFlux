@@ -543,7 +543,9 @@ function UploadSection({ onUploaded }: { onUploaded: () => void }) {
         {upload.isError && (
           <p className="cyber-mono text-sm">
             !{' '}
-            {upload.error instanceof ApiError ? upload.error.message : t('certificates.uploadFailed')}
+            {upload.error instanceof ApiError
+              ? upload.error.message
+              : t('certificates.uploadFailed')}
           </p>
         )}
         {upload.isSuccess && upload.data && (

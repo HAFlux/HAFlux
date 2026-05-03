@@ -49,7 +49,7 @@ export default function ErrorPagesPage() {
   const [activeClusterId, setActiveClusterId] = useState<string | null>(null);
   useEffect(() => {
     if (!activeClusterId && clusters.length > 0) {
-      setActiveClusterId(clusters[0]!.id);
+      setActiveClusterId(clusters[0]?.id);
     }
   }, [activeClusterId, clusters]);
 
@@ -123,10 +123,7 @@ export default function ErrorPagesPage() {
 
       {activeClusterId && filesQ.isError && (
         <p className="cyber-mono text-sm">
-          !{' '}
-          {filesQ.error instanceof ApiError
-            ? filesQ.error.message
-            : t('errorPages.loadFailed')}
+          ! {filesQ.error instanceof ApiError ? filesQ.error.message : t('errorPages.loadFailed')}
         </p>
       )}
 
@@ -166,11 +163,7 @@ export default function ErrorPagesPage() {
             </div>
             <span
               className="cyber-tag shrink-0 self-start md:self-auto"
-              style={
-                activeItem.isCustom
-                  ? { borderColor: 'var(--color-fg)' }
-                  : { opacity: 0.75 }
-              }
+              style={activeItem.isCustom ? { borderColor: 'var(--color-fg)' } : { opacity: 0.75 }}
             >
               {activeItem.isCustom ? t('errorPages.badgeCustom') : t('errorPages.badgeDefault')}
             </span>
@@ -223,8 +216,7 @@ export default function ErrorPagesPage() {
 
           {save.isError && (
             <p className="cyber-mono text-sm">
-              !{' '}
-              {save.error instanceof ApiError ? save.error.message : t('errorPages.saveFailed')}
+              ! {save.error instanceof ApiError ? save.error.message : t('errorPages.saveFailed')}
             </p>
           )}
           {reset.isError && (
@@ -233,12 +225,8 @@ export default function ErrorPagesPage() {
               {reset.error instanceof ApiError ? reset.error.message : t('errorPages.resetFailed')}
             </p>
           )}
-          {save.isSuccess && (
-            <p className="cyber-mono text-sm">{t('errorPages.saveSuccess')}</p>
-          )}
-          {reset.isSuccess && (
-            <p className="cyber-mono text-sm">{t('errorPages.resetSuccess')}</p>
-          )}
+          {save.isSuccess && <p className="cyber-mono text-sm">{t('errorPages.saveSuccess')}</p>}
+          {reset.isSuccess && <p className="cyber-mono text-sm">{t('errorPages.resetSuccess')}</p>}
         </div>
       )}
     </div>

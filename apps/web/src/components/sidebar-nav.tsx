@@ -1,10 +1,10 @@
-import { NavLink } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
+import { useTranslation } from 'react-i18next';
+import { NavLink } from 'react-router-dom';
 
-import { Logo, GithubIcon } from '@/components/icons';
-import { ThemeSwitch } from '@/components/theme-switch';
+import { GithubIcon, Logo } from '@/components/icons';
 import { LangSwitch } from '@/components/lang-switch';
+import { ThemeSwitch } from '@/components/theme-switch';
 import { siteConfig } from '@/config/site';
 import { useAuth } from '@/lib/auth';
 import pkg from '../../package.json';

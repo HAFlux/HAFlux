@@ -10,7 +10,10 @@ export const DateTimeSchema = z.string().datetime();
 export const LoginRequestSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(256),
-  totp: z.string().regex(/^\d{6}$/).optional(),
+  totp: z
+    .string()
+    .regex(/^\d{6}$/)
+    .optional(),
 });
 export type LoginRequest = z.infer<typeof LoginRequestSchema>;
 

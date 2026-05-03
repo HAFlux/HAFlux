@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
 import { TerminalTypewriter } from '@/components/terminal-typewriter';
+import { useEffect, useState } from 'react';
 
 export interface PanelLoaderProps {
   /** Текст рядом с курсором; по умолчанию — пустой. */
@@ -18,7 +18,7 @@ export function PanelLoader({ message = '', durationMs = 1500, ceil = 100 }: Pan
     const start = performance.now();
     const tick = (now: number) => {
       const t = Math.min(1, (now - start) / durationMs);
-      const eased = 1 - Math.pow(1 - t, 3);
+      const eased = 1 - (1 - t) ** 3;
       const value = Math.round(eased * ceil);
       setPct(value);
       if (t < 1) raf = requestAnimationFrame(tick);

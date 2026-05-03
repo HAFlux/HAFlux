@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
+import { AcmeService } from './acme.service';
 import { CertificatesController } from './certificates.controller';
+import { CertificatesService } from './certificates.service';
 import { CloudflareDnsProvider } from './cloudflare.provider';
 import { CryptoService } from './crypto.service';
-import { AcmeService } from './acme.service';
-import { CertificatesService } from './certificates.service';
 import { CertificateRenewService } from './renew.service';
 
 @Module({

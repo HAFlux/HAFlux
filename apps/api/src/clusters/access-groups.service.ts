@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
-import { CryptoService } from '../certificates/crypto.service';
+import type { CryptoService } from '../certificates/crypto.service';
 import { AppException, ErrorCode } from '../common/errors';
-import { PrismaService } from '../prisma/prisma.service';
-import { ProxyHostsRenderApplyService } from '../proxy-hosts/render-apply.service';
+import type { PrismaService } from '../prisma/prisma.service';
+import type { ProxyHostsRenderApplyService } from '../proxy-hosts/render-apply.service';
 
 const NameSchema = z
   .string()
@@ -147,8 +147,7 @@ export class AccessGroupsService {
       where: { id, clusterId },
       include: { _count: { select: { proxyHostMemberships: true } } },
     });
-    if (!r)
-      throw new AppException(ErrorCode.NOT_FOUND, 'Access group not found', 404);
+    if (!r) throw new AppException(ErrorCode.NOT_FOUND, 'Access group not found', 404);
     const ips = (r.ipAllowlist as string[]) ?? [];
     const users = (r.authUsers as { username: string; passwordEnc: string }[]) ?? [];
     return {
@@ -213,15 +212,18 @@ export class AccessGroupsService {
     }
 
     const existing = await this.prisma.accessGroup.findFirst({ where: { id, clusterId } });
-    if (!existing)
-      throw new AppException(ErrorCode.NOT_FOUND, 'Access group not found', 404);
+    if (!existing) throw new AppException(ErrorCode.NOT_FOUND, 'Access group not found', 404);
 
     if (parsed.data.name && parsed.data.name !== existing.name) {
       const taken = await this.prisma.accessGroup.findUnique({
         where: { clusterId_name: { clusterId, name: parsed.data.name.trim() } },
       });
       if (taken)
-        throw new AppException(ErrorCode.CONFLICT, `Name '${parsed.data.name}' is already taken`, 409);
+        throw new AppException(
+          ErrorCode.CONFLICT,
+          `Name '${parsed.data.name}' is already taken`,
+          409,
+        );
     }
 
     let nextIp = (existing.ipAllowlist as string[]) ?? [];
@@ -278,8 +280,7 @@ export class AccessGroupsService {
   async remove(clusterId: string, id: string) {
     await this.assertCluster(clusterId);
     const existing = await this.prisma.accessGroup.findFirst({ where: { id, clusterId } });
-    if (!existing)
-      throw new AppException(ErrorCode.NOT_FOUND, 'Access group not found', 404);
+    if (!existing) throw new AppException(ErrorCode.NOT_FOUND, 'Access group not found', 404);
 
     await this.prisma.accessGroup.delete({ where: { id } });
     await this.applySafe(clusterId);
@@ -294,7 +295,10 @@ export class AccessGroupsService {
   }
 
   private async assertCluster(clusterId: string): Promise<void> {
-    const c = await this.prisma.cluster.findUnique({ where: { id: clusterId }, select: { id: true } });
+    const c = await this.prisma.cluster.findUnique({
+      where: { id: clusterId },
+      select: { id: true },
+    });
     if (!c) throw new AppException(ErrorCode.CLUSTER_NOT_FOUND, 'Cluster not found', 404);
   }
 
