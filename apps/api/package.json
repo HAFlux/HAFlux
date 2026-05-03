@@ -24,7 +24,7 @@
     "@nestjs/platform-fastify": "11.0.5",
     "@nestjs/swagger": "8.1.0",
     "@nestjs/terminus": "11.0.0",
-    "@prisma/client": "6.1.0",
+    "@prisma/client": "7.8.0",
     "prisma": "6.1.0",
     "@haflux/contracts": "workspace:*",
     "acme-client": "5.4.0",
