@@ -7,7 +7,7 @@ import { LangSwitch } from '@/components/lang-switch';
 import { ThemeSwitch } from '@/components/theme-switch';
 import { siteConfig } from '@/config/site';
 import { useAuth } from '@/lib/auth';
-import pkg from '../../package.json';
+import { APP_VERSION } from '@/version';
 
 const NAV_KEYS: Record<string, string> = {
   '/dashboard': 'nav.dashboard',
@@ -74,7 +74,7 @@ export const SidebarNav = ({ onNavigate }: { onNavigate?: () => void }) => {
         style={{ borderTop: '1px solid var(--color-separator)' }}
       >
         <div className="flex items-center justify-between">
-          <span className="cyber-label">v{pkg.version}</span>
+          <span className="cyber-label">v{APP_VERSION}</span>
           <div className="flex items-center gap-3">
             <a
               aria-label="GitHub"

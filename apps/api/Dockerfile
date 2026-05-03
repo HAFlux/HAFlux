@@ -2,6 +2,11 @@
 FROM node:20-alpine AS builder
 WORKDIR /repo
 
+# Тег релиза (например v0.1.0) пробрасывается release.yml через --build-arg
+# и попадает в Vite-build SPA как import.meta.env.VITE_APP_VERSION.
+ARG APP_VERSION=dev
+ENV VITE_APP_VERSION=${APP_VERSION}
+
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
 # Lockfile + manifests всех пакетов воркспейса (включая web)

@@ -47,7 +47,7 @@
     "emailLabel": "Email",
     "passwordLabel": "Password",
     "signingIn": "Signing in…",
-    "footer": "[ HPM · v0.0.1 ]"
+    "footer": "[ HAFlux · v{{version}} ]"
   },
   "dashboard": {
     "title": "Dashboard",

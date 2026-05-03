@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 
 import { PageHeader } from '@/components/page-header';
 import { siteConfig } from '@/config/site';
-import pkg from '../../package.json';
+import { APP_VERSION } from '@/version';
 
 export default function HelpPage() {
   const { t } = useTranslation();
@@ -36,7 +36,7 @@ export default function HelpPage() {
           {t('help.repoLink')}
         </a>
         {' · '}
-        {t('help.versionLine', { version: pkg.version })}
+        {t('help.versionLine', { version: APP_VERSION })}
       </p>
     </div>
   );

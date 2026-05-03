@@ -7,6 +7,7 @@ import { TerminalTypewriter } from '@/components/terminal-typewriter';
 import { ThemeSwitch } from '@/components/theme-switch';
 import { ApiError, api } from '@/lib/api';
 import { setToken, useAuth } from '@/lib/auth';
+import { APP_VERSION } from '@/version';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -108,7 +109,7 @@ export default function LoginPage() {
           </div>
 
           <div className="text-center">
-            <span className="cyber-label">[ HAFlux · v0.0.1 ]</span>
+            <span className="cyber-label">[ HAFlux · v{APP_VERSION} ]</span>
           </div>
         </div>
       </div>
