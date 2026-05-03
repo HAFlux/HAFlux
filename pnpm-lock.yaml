@@ -20,7 +20,7 @@ importers:
       '@fastify/static':
         specifier: 8.0.4
         version: 8.0.4
-      '@hapilot/contracts':
+      '@haflux/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
       '@nestjs/common':
@@ -123,7 +123,7 @@ importers:
       '@fontsource-variable/geist-mono':
         specifier: ^5.1.1
         version: 5.2.7
-      '@hapilot/contracts':
+      '@haflux/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
       '@heroui/react':
@@ -151,8 +151,8 @@ importers:
         specifier: ^19.0.0
         version: 19.2.5(react@19.2.5)
       react-i18next:
-        specifier: 15.4.0
-        version: 15.4.0(i18next@23.16.6)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        specifier: 17.0.6
+        version: 17.0.6(i18next@23.16.6)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(typescript@5.6.3)
       react-router-dom:
         specifier: 6.23.0
         version: 6.23.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -2946,17 +2946,20 @@ packages:
     peerDependencies:
       react: ^19.2.5
 
-  react-i18next@15.4.0:
-    resolution: {integrity: sha512-Py6UkX3zV08RTvL6ZANRoBh9sL/ne6rQq79XlkHEdd82cZr2H9usbWpUNVadJntIZP2pu3M2rL1CN+5rQYfYFw==}
+  react-i18next@17.0.6:
+    resolution: {integrity: sha512-WzJ6SMKF+GTD7JZZqxSR1AKKmXjaSu39sClUrNlwxS4Tl7a99O+ltFy6yhPMO+wgZuxpQjJ2PZkfrQKmAqrLhw==}
     peerDependencies:
-      i18next: '>= 23.2.3'
+      i18next: '>= 26.0.1'
       react: '>= 16.8.0'
       react-dom: '*'
       react-native: '*'
+      typescript: ^5 || ^6
     peerDependenciesMeta:
       react-dom:
         optional: true
       react-native:
+        optional: true
+      typescript:
         optional: true
 
   react-is@16.13.1:
@@ -6285,14 +6288,16 @@ snapshots:
       react: 19.2.5
       scheduler: 0.27.0
 
-  react-i18next@15.4.0(i18next@23.16.6)(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
+  react-i18next@17.0.6(i18next@23.16.6)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(typescript@5.6.3):
     dependencies:
       '@babel/runtime': 7.29.2
       html-parse-stringify: 3.0.1
       i18next: 23.16.6
       react: 19.2.5
+      use-sync-external-store: 1.6.0(react@19.2.5)
     optionalDependencies:
       react-dom: 19.2.5(react@19.2.5)
+      typescript: 5.6.3
 
   react-is@16.13.1: {}
 
