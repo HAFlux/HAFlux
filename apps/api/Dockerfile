@@ -9,19 +9,22 @@ ENV VITE_APP_VERSION=${APP_VERSION}
 
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
-# Lockfile + manifests всех пакетов воркспейса (включая web)
+# Lockfile + manifests — отдельный слой: при смене только исходников кэш store не инвалидируется.
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* tsconfig.base.json biome.json ./
 COPY packages/contracts/package.json ./packages/contracts/
 COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
 
-# Один общий install для api+web+contracts (workspace links)
-RUN pnpm install --frozen-lockfile=false
+# Скачиваем артефакты в pnpm store (без node_modules) — быстрее повторные сборки в CI.
+RUN pnpm fetch
 
 # Sources
 COPY packages/contracts ./packages/contracts
 COPY apps/api ./apps/api
 COPY apps/web ./apps/web
+
+# Линковка из store (строго по lockfile — предсказуемые образы).
+RUN pnpm install --frozen-lockfile --prefer-offline
 
 # Build: contracts → web (Vite SPA) → prisma generate → api (Nest)
 RUN pnpm --filter @haflux/contracts build \
