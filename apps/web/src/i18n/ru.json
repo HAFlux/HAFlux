@@ -233,7 +233,7 @@
     "healthCheckPathLabel": "// Путь проверки (ping)",
     "healthCheckPathPlaceholder": "/health или /api/ping",
     "healthCheckPathHint": "Пусто — запрос GET на корень «/». Только путь (не полный URL), без «..».",
-    "helpHealthCheckPath": "Используется для кнопки «Проверить» и фонового пинга раз в ~60 с. Не влияет на маршрутизацию HAProxy.",
+    "helpHealthCheckPath": "Используется для кнопки «Проверить» и фонового пинга раз в ~60 с. Запрос идёт на upstream с заголовком Host = ваш публичный домен (как у браузера). Не влияет на маршрутизацию HAProxy.",
     "helpHttp3": "HTTP/3 использует QUIC (UDP) вместе с TLS на TCP :443.",
     "helpCustomHeaders": "Добавляются как http-request set-header к upstream. Имена при сохранении приводятся к нижнему регистру.",
     "tagListen": "listen :{{port}}",

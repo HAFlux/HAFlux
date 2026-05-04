@@ -233,7 +233,7 @@
     "healthCheckPathLabel": "// Health check path (ping)",
     "healthCheckPathPlaceholder": "/health or /api/ping",
     "healthCheckPathHint": "Leave empty for GET «/». Path only (not a full URL), no «..».",
-    "helpHealthCheckPath": "Used by the Check button and the ~60s background probe. Does not change HAProxy routing.",
+    "helpHealthCheckPath": "Used by the Check button and the ~60s background probe. The request hits upstream with Host set to your public domain (like a browser). Does not change HAProxy routing.",
     "helpHttp3": "HTTP/3 advertises QUIC (UDP) alongside TLS on TCP :443.",
     "helpCustomHeaders": "Applied as http-request set-header toward the upstream. Names are lowercased when saving.",
     "tagListen": "listen :{{port}}",

@@ -1,3 +1,5 @@
+import * as http from 'node:http';
+import * as https from 'node:https';
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProxyHostsService } from './proxy-hosts.service';
@@ -17,6 +19,13 @@ function buildProbeUrl(
 ): string {
   const path = probePathFromDb(healthCheckPath);
   return `${scheme}://${host}:${port}${path}`;
+}
+
+/** Заголовок Host как у клиентов за HAProxy (vhost на upstream). Wildcard в UI не подставляем. */
+function hostHeaderForProbe(publicDomain: string): string | undefined {
+  const d = publicDomain.trim();
+  if (!d || d.startsWith('*.')) return undefined;
+  return d;
 }
 
 /**
@@ -57,6 +66,7 @@ export class ProxyHostsHealthService implements OnModuleInit, OnModuleDestroy {
       where: { enabled: true },
       select: {
         id: true,
+        domain: true,
         forwardScheme: true,
         forwardHost: true,
         forwardPort: true,
@@ -71,7 +81,8 @@ export class ProxyHostsHealthService implements OnModuleInit, OnModuleDestroy {
           return;
         }
         const url = buildProbeUrl(h.forwardScheme, h.forwardHost, h.forwardPort, h.healthCheckPath);
-        const result = await this.probe(url);
+        const hostHdr = hostHeaderForProbe(h.domain);
+        const result = await this.probe(url, hostHdr);
         await this.prisma.proxyHost.update({
           where: { id: h.id },
           data: {
@@ -93,6 +104,7 @@ export class ProxyHostsHealthService implements OnModuleInit, OnModuleDestroy {
       where: { id },
       select: {
         id: true,
+        domain: true,
         forwardScheme: true,
         forwardHost: true,
         forwardPort: true,
@@ -104,7 +116,8 @@ export class ProxyHostsHealthService implements OnModuleInit, OnModuleDestroy {
       return this.hosts.getOneForApi(id);
     }
     const url = buildProbeUrl(h.forwardScheme, h.forwardHost, h.forwardPort, h.healthCheckPath);
-    const result = await this.probe(url);
+    const hostHdr = hostHeaderForProbe(h.domain);
+    const result = await this.probe(url, hostHdr);
     await this.prisma.proxyHost.update({
       where: { id },
       data: {
@@ -118,31 +131,63 @@ export class ProxyHostsHealthService implements OnModuleInit, OnModuleDestroy {
     return this.hosts.getOneForApi(id);
   }
 
-  private async probe(url: string): Promise<{
+  /**
+   * GET по URL. `Host` задаём явно для совпадения с vhost на upstream (в Node `fetch`
+   * подменяет Host по URL и игнорирует переданный заголовок).
+   */
+  private async probe(
+    urlStr: string,
+    /** Публичный FQDN хоста — как у клиента за HAProxy. */
+    hostHeader?: string,
+  ): Promise<{
     status: 'HEALTHY' | 'UNHEALTHY' | 'DEGRADED';
     code: number | null;
     latencyMs: number;
     error: string | null;
   }> {
     const t0 = Date.now();
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), this.probeTimeoutMs);
     try {
-      const ac = new AbortController();
-      const timer = setTimeout(() => ac.abort(), this.probeTimeoutMs);
-      try {
-        const res = await fetch(url, {
-          method: 'GET',
-          signal: ac.signal,
-          redirect: 'manual',
-        });
-        const latencyMs = Date.now() - t0;
-        const code = res.status;
-        let status: 'HEALTHY' | 'UNHEALTHY' | 'DEGRADED' = 'HEALTHY';
-        if (code >= 500) status = 'UNHEALTHY';
-        else if (code >= 400) status = 'DEGRADED';
-        return { status, code, latencyMs, error: null };
-      } finally {
-        clearTimeout(timer);
+      const u = new URL(urlStr);
+      const isHttps = u.protocol === 'https:';
+      const mod = isHttps ? https : http;
+      const port = u.port ? Number(u.port) : isHttps ? 443 : 80;
+      const headers: http.OutgoingHttpHeaders = {};
+      if (hostHeader) {
+        headers.Host = hostHeader;
       }
+
+      const code = await new Promise<number | null>((resolve, reject) => {
+        const req = mod.request(
+          {
+            hostname: u.hostname,
+            port,
+            path: `${u.pathname}${u.search}`,
+            method: 'GET',
+            headers,
+            signal: ac.signal,
+            timeout: this.probeTimeoutMs,
+            ...(isHttps ? { rejectUnauthorized: false } : {}),
+          },
+          (res) => {
+            res.resume();
+            resolve(res.statusCode ?? null);
+          },
+        );
+        req.on('error', reject);
+        req.on('timeout', () => {
+          req.destroy();
+          reject(new Error('socket timeout'));
+        });
+        req.end();
+      });
+
+      const latencyMs = Date.now() - t0;
+      let status: 'HEALTHY' | 'UNHEALTHY' | 'DEGRADED' = 'HEALTHY';
+      if (code != null && code >= 500) status = 'UNHEALTHY';
+      else if (code != null && code >= 400) status = 'DEGRADED';
+      return { status, code, latencyMs, error: null };
     } catch (err) {
       const latencyMs = Date.now() - t0;
       const message = err instanceof Error ? err.message : String(err);
@@ -152,6 +197,8 @@ export class ProxyHostsHealthService implements OnModuleInit, OnModuleDestroy {
         latencyMs,
         error: message.slice(0, 200),
       };
+    } finally {
+      clearTimeout(timer);
     }
   }
 }
