@@ -103,9 +103,9 @@ export class HaproxyLogsService implements OnModuleInit, OnModuleDestroy {
     let buffer = '';
     const onChunk = (chunk: Buffer | string) => {
       buffer += chunk.toString('utf8');
-      let idx: number;
-      // eslint-disable-next-line no-cond-assign
-      while ((idx = buffer.indexOf('\n')) !== -1) {
+      for (;;) {
+        const idx = buffer.indexOf('\n');
+        if (idx === -1) break;
         const line = buffer.slice(0, idx);
         buffer = buffer.slice(idx + 1);
         if (line) this.processLine(line);

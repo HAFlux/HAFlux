@@ -34,14 +34,26 @@ export default function ProxyHostsPage() {
 
   const hostsQ = useQuery({
     queryKey: ['proxy-hosts', activeClusterId],
-    queryFn: () => api.proxyHosts.list(activeClusterId!),
-    enabled: !!activeClusterId,
+    queryFn: () => {
+      const id = activeClusterId;
+      if (id == null) {
+        return Promise.reject(new Error('activeClusterId is required'));
+      }
+      return api.proxyHosts.list(id);
+    },
+    enabled: activeClusterId != null,
   });
 
   const accessGroupsQ = useQuery({
     queryKey: ['access-groups', activeClusterId],
-    queryFn: () => api.clusters.accessGroups.list(activeClusterId!),
-    enabled: !!activeClusterId,
+    queryFn: () => {
+      const id = activeClusterId;
+      if (id == null) {
+        return Promise.reject(new Error('activeClusterId is required'));
+      }
+      return api.clusters.accessGroups.list(id);
+    },
+    enabled: activeClusterId != null,
   });
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -501,7 +513,7 @@ function ProxyHostStatsPanel({ hostId }: { hostId: string }) {
               padding: 8,
             }}
           >
-            {l.map((line, i) => {
+            {l.map((line) => {
               const c =
                 line.status >= 500
                   ? '#dc2626'
@@ -512,7 +524,7 @@ function ProxyHostStatsPanel({ hostId }: { hostId: string }) {
                       : 'var(--color-muted)';
               return (
                 <div
-                  key={i}
+                  key={`${line.time}|${line.clientIp}|${line.method}|${line.path}|${line.status}|${line.bytes}|${line.durationMs}|${line.url}`}
                   style={{
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
@@ -602,17 +614,32 @@ function HealthDot({ status }: { status: ProxyHost['healthStatus'] }) {
 
 // ─── Universal create + edit form ─────────────────────────────────────
 
-function headerRowsFromHost(host: ProxyHost): { key: string; value: string }[] {
-  const ch = host.customHeaders;
-  if (!ch || typeof ch !== 'object' || Array.isArray(ch)) return [{ key: '', value: '' }];
-  const entries = Object.entries(ch);
-  if (entries.length === 0) return [{ key: '', value: '' }];
-  return entries.map(([key, value]) => ({ key, value }));
+function newCustomHeaderRowId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
-function rowsToCustomHeaders(
-  rows: { key: string; value: string }[],
-): Record<string, string> | null {
+interface CustomHeaderRow {
+  id: string;
+  key: string;
+  value: string;
+}
+
+function newEmptyCustomHeaderRow(): CustomHeaderRow {
+  return { id: newCustomHeaderRowId(), key: '', value: '' };
+}
+
+function headerRowsFromHost(host: ProxyHost): CustomHeaderRow[] {
+  const ch = host.customHeaders;
+  if (!ch || typeof ch !== 'object' || Array.isArray(ch)) return [newEmptyCustomHeaderRow()];
+  const entries = Object.entries(ch);
+  if (entries.length === 0) return [newEmptyCustomHeaderRow()];
+  return entries.map(([key, value]) => ({ id: newCustomHeaderRowId(), key, value }));
+}
+
+function rowsToCustomHeaders(rows: CustomHeaderRow[]): Record<string, string> | null {
   const out: Record<string, string> = {};
   for (const r of rows) {
     const k = r.key.trim().toLowerCase();
@@ -638,7 +665,7 @@ interface FormState {
   http2: boolean;
   http3: boolean;
   enabled: boolean;
-  customHeaderRows: { key: string; value: string }[];
+  customHeaderRows: CustomHeaderRow[];
   notes: string;
   /** Пустая строка = пинг на «/». */
   healthCheckPath: string;
@@ -661,7 +688,7 @@ function defaultFormState(): FormState {
     http2: true,
     http3: false,
     enabled: true,
-    customHeaderRows: [{ key: '', value: '' }],
+    customHeaderRows: [newEmptyCustomHeaderRow()],
     notes: '',
     healthCheckPath: '',
   };
@@ -716,12 +743,11 @@ function ProxyHostFormModal({
   // При открытии модалки — синхронизируем стейт с host'ом (для edit) или
   // ресетим (для create). Зависим от host?.id, не от ссылки host — иначе
   // лишние срабатывания сбрасывают accessGroupIds и чекбоксы «не держатся».
+  // biome-ignore lint/correctness/useExhaustiveDependencies: намеренно только open / id / mode, не вся ссылка host
   useEffect(() => {
     if (!open) return;
     setState(host ? fromHost(host) : defaultFormState());
     setTouched({ domain: false, forwardHost: false });
-    // host в замыкании обновляется при смене id; при той же ссылке host не сбрасываем форму
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, host?.id, mode]);
 
   // Сертификаты, покрывающие выбранный домен
@@ -1222,9 +1248,9 @@ function ProxyHostFormModal({
               <Help text={t('proxyHosts.helpCustomHeaders')} />
             </span>
             <div className="flex flex-col gap-2">
-              {state.customHeaderRows.map((row, idx) => (
+              {state.customHeaderRows.map((row) => (
                 <div
-                  key={idx}
+                  key={row.id}
                   className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_1fr_auto] md:items-end"
                 >
                   <label className="flex flex-col gap-1">
@@ -1236,11 +1262,12 @@ function ProxyHostFormModal({
                       placeholder={t('proxyHosts.headerNamePlaceholder')}
                       value={row.key}
                       onChange={(e) =>
-                        setState((s) => {
-                          const next = [...s.customHeaderRows];
-                          next[idx] = { ...next[idx]!, key: e.target.value };
-                          return { ...s, customHeaderRows: next };
-                        })
+                        setState((s) => ({
+                          ...s,
+                          customHeaderRows: s.customHeaderRows.map((r) =>
+                            r.id === row.id ? { ...r, key: e.target.value } : r,
+                          ),
+                        }))
                       }
                     />
                   </label>
@@ -1252,11 +1279,12 @@ function ProxyHostFormModal({
                       className="cyber-input font-mono text-sm"
                       value={row.value}
                       onChange={(e) =>
-                        setState((s) => {
-                          const next = [...s.customHeaderRows];
-                          next[idx] = { ...next[idx]!, value: e.target.value };
-                          return { ...s, customHeaderRows: next };
-                        })
+                        setState((s) => ({
+                          ...s,
+                          customHeaderRows: s.customHeaderRows.map((r) =>
+                            r.id === row.id ? { ...r, value: e.target.value } : r,
+                          ),
+                        }))
                       }
                     />
                   </label>
@@ -1268,8 +1296,8 @@ function ProxyHostFormModal({
                         ...s,
                         customHeaderRows:
                           s.customHeaderRows.length <= 1
-                            ? [{ key: '', value: '' }]
-                            : s.customHeaderRows.filter((_, i) => i !== idx),
+                            ? [newEmptyCustomHeaderRow()]
+                            : s.customHeaderRows.filter((r) => r.id !== row.id),
                       }))
                     }
                   >
@@ -1283,7 +1311,7 @@ function ProxyHostFormModal({
                 onClick={() =>
                   setState((s) => ({
                     ...s,
-                    customHeaderRows: [...s.customHeaderRows, { key: '', value: '' }],
+                    customHeaderRows: [...s.customHeaderRows, newEmptyCustomHeaderRow()],
                   }))
                 }
               >
@@ -1379,6 +1407,23 @@ function formatHaproxyTime(t: string): string {
   // Пытаемся распарсить '02/May/2026:08:07:58.182'
   const m = /^(\d{1,2})\/(\w{3})\/(\d{4}):(\d{2}):(\d{2}):(\d{2})\.?(\d+)?$/.exec(t.trim());
   if (!m) return t;
+  const dayStr = m[1];
+  const monStr = m[2];
+  const yearStr = m[3];
+  const hourStr = m[4];
+  const minStr = m[5];
+  const secStr = m[6];
+  const msPart = m[7];
+  if (
+    dayStr === undefined ||
+    monStr === undefined ||
+    yearStr === undefined ||
+    hourStr === undefined ||
+    minStr === undefined ||
+    secStr === undefined
+  ) {
+    return t;
+  }
   const months: Record<string, number> = {
     Jan: 0,
     Feb: 1,
@@ -1393,9 +1438,19 @@ function formatHaproxyTime(t: string): string {
     Nov: 10,
     Dec: 11,
   };
-  const mo = months[m[2]!];
+  const mo = months[monStr];
   if (mo === undefined) return t;
-  const d = new Date(Date.UTC(+m[3]!, mo, +m[1]!, +m[4]!, +m[5]!, +m[6]!, +(m[7] ?? 0)));
+  const d = new Date(
+    Date.UTC(
+      Number(yearStr),
+      mo,
+      Number(dayStr),
+      Number(hourStr),
+      Number(minStr),
+      Number(secStr),
+      msPart !== undefined ? Number(msPart) : 0,
+    ),
+  );
   if (Number.isNaN(d.getTime())) return t;
   const ms = String(d.getMilliseconds()).padStart(3, '0');
   return `${d.toLocaleString(undefined, {

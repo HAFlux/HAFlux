@@ -65,7 +65,9 @@ const CreateSchema = z.object({
     .max(512)
     .regex(/^[^\r\n]*$/)
     .refine((s) => !s.includes('..'), { message: 'healthCheckPath must not contain ..' })
-    .refine((s) => !/^[a-z]+:/i.test(s.trim()), { message: 'healthCheckPath must be a path, not a URL' })
+    .refine((s) => !/^[a-z]+:/i.test(s.trim()), {
+      message: 'healthCheckPath must be a path, not a URL',
+    })
     .nullable()
     .optional(),
 });

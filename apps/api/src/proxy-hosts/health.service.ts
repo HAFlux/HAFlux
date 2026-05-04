@@ -70,12 +70,7 @@ export class ProxyHostsHealthService implements OnModuleInit, OnModuleDestroy {
         if (h.forwardScheme === 'tcp' || h.forwardScheme === 'udp') {
           return;
         }
-        const url = buildProbeUrl(
-          h.forwardScheme,
-          h.forwardHost,
-          h.forwardPort,
-          h.healthCheckPath,
-        );
+        const url = buildProbeUrl(h.forwardScheme, h.forwardHost, h.forwardPort, h.healthCheckPath);
         const result = await this.probe(url);
         await this.prisma.proxyHost.update({
           where: { id: h.id },
@@ -108,12 +103,7 @@ export class ProxyHostsHealthService implements OnModuleInit, OnModuleDestroy {
     if (h.forwardScheme === 'tcp' || h.forwardScheme === 'udp') {
       return this.hosts.getOneForApi(id);
     }
-    const url = buildProbeUrl(
-      h.forwardScheme,
-      h.forwardHost,
-      h.forwardPort,
-      h.healthCheckPath,
-    );
+    const url = buildProbeUrl(h.forwardScheme, h.forwardHost, h.forwardPort, h.healthCheckPath);
     const result = await this.probe(url);
     await this.prisma.proxyHost.update({
       where: { id },
