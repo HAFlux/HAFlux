@@ -23,6 +23,8 @@ export interface CreateProxyHostInput {
   http3?: boolean;
   notes?: string | null;
   customHeaders?: Record<string, string> | null;
+  /** Путь GET для health probe; пустой/null = «/». */
+  healthCheckPath?: string | null;
 }
 
 export type UpdateProxyHostInput = Partial<Omit<CreateProxyHostInput, 'clusterId'>> & {
@@ -118,6 +120,7 @@ export class ProxyHostsService {
           if (ch === undefined) return {};
           return { customHeaders: ch === null ? Prisma.JsonNull : ch };
         })(),
+        healthCheckPath: this.coerceHealthCheckPath(input.healthCheckPath),
         accessGroupMemberships: {
           create: (input.accessGroupIds ?? []).map((accessGroupId) => ({ accessGroupId })),
         },
@@ -179,6 +182,9 @@ export class ProxyHostsService {
                 return ch === null ? Prisma.JsonNull : ch;
               })(),
             }
+          : {}),
+        ...(input.healthCheckPath !== undefined
+          ? { healthCheckPath: this.coerceHealthCheckPath(input.healthCheckPath) }
           : {}),
         ...(input.accessGroupIds !== undefined
           ? {
@@ -260,6 +266,15 @@ export class ProxyHostsService {
         `Certificate does not cover '${domain}' (CN=${c.commonName}, SAN=${c.sans.join(',')})`,
       );
     }
+  }
+
+  /** null/пусто в БД = при probe используется «/». */
+  private coerceHealthCheckPath(value: string | null | undefined): string | null {
+    if (value == null) return null;
+    const t = value.trim();
+    if (!t) return null;
+    const p = t.startsWith('/') ? t : `/${t}`;
+    return p.replace(/\/{2,}/g, '/') || '/';
   }
 
   private normalizeCustomHeadersJson(

@@ -2,6 +2,23 @@ import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@ne
 import { PrismaService } from '../prisma/prisma.service';
 import { ProxyHostsService } from './proxy-hosts.service';
 
+function probePathFromDb(healthCheckPath: string | null | undefined): string {
+  const raw = healthCheckPath?.trim();
+  if (!raw) return '/';
+  const p = raw.startsWith('/') ? raw : `/${raw}`;
+  return p.replace(/\/{2,}/g, '/') || '/';
+}
+
+function buildProbeUrl(
+  scheme: string,
+  host: string,
+  port: number,
+  healthCheckPath: string | null | undefined,
+): string {
+  const path = probePathFromDb(healthCheckPath);
+  return `${scheme}://${host}:${port}${path}`;
+}
+
 /**
  * Периодический probing upstream'ов всех proxy host'ов.
  *
@@ -43,6 +60,7 @@ export class ProxyHostsHealthService implements OnModuleInit, OnModuleDestroy {
         forwardScheme: true,
         forwardHost: true,
         forwardPort: true,
+        healthCheckPath: true,
       },
     });
     if (hosts.length === 0) return;
@@ -52,7 +70,12 @@ export class ProxyHostsHealthService implements OnModuleInit, OnModuleDestroy {
         if (h.forwardScheme === 'tcp' || h.forwardScheme === 'udp') {
           return;
         }
-        const url = `${h.forwardScheme}://${h.forwardHost}:${h.forwardPort}/`;
+        const url = buildProbeUrl(
+          h.forwardScheme,
+          h.forwardHost,
+          h.forwardPort,
+          h.healthCheckPath,
+        );
         const result = await this.probe(url);
         await this.prisma.proxyHost.update({
           where: { id: h.id },
@@ -78,13 +101,19 @@ export class ProxyHostsHealthService implements OnModuleInit, OnModuleDestroy {
         forwardScheme: true,
         forwardHost: true,
         forwardPort: true,
+        healthCheckPath: true,
       },
     });
     if (!h) return null;
     if (h.forwardScheme === 'tcp' || h.forwardScheme === 'udp') {
       return this.hosts.getOneForApi(id);
     }
-    const url = `${h.forwardScheme}://${h.forwardHost}:${h.forwardPort}/`;
+    const url = buildProbeUrl(
+      h.forwardScheme,
+      h.forwardHost,
+      h.forwardPort,
+      h.healthCheckPath,
+    );
     const result = await this.probe(url);
     await this.prisma.proxyHost.update({
       where: { id },

@@ -640,6 +640,8 @@ interface FormState {
   enabled: boolean;
   customHeaderRows: { key: string; value: string }[];
   notes: string;
+  /** Пустая строка = пинг на «/». */
+  healthCheckPath: string;
 }
 
 function defaultFormState(): FormState {
@@ -661,6 +663,7 @@ function defaultFormState(): FormState {
     enabled: true,
     customHeaderRows: [{ key: '', value: '' }],
     notes: '',
+    healthCheckPath: '',
   };
 }
 
@@ -683,6 +686,7 @@ function fromHost(host: ProxyHost): FormState {
     enabled: host.enabled,
     customHeaderRows: headerRowsFromHost(host),
     notes: host.notes ?? '',
+    healthCheckPath: host.healthCheckPath ?? '',
   };
 }
 
@@ -769,6 +773,11 @@ function ProxyHostFormModal({
         http3: isL7 && state.ssl && state.http3,
         accessGroupIds: isL7 ? state.accessGroupIds : [],
         notes: state.notes.trim() || null,
+        healthCheckPath: isL7
+          ? state.healthCheckPath.trim()
+            ? state.healthCheckPath.trim()
+            : null
+          : null,
         customHeaders: isL7 ? rowsToCustomHeaders(state.customHeaderRows) : null,
       } satisfies CreateProxyHostInput),
     onSuccess: onSaved,
@@ -794,6 +803,11 @@ function ProxyHostFormModal({
         enabled: state.enabled,
         accessGroupIds: isL7 ? state.accessGroupIds : [],
         notes: state.notes.trim() || null,
+        healthCheckPath: isL7
+          ? state.healthCheckPath.trim()
+            ? state.healthCheckPath.trim()
+            : null
+          : null,
         customHeaders: isL7 ? rowsToCustomHeaders(state.customHeaderRows) : null,
       });
     },
@@ -1182,6 +1196,24 @@ function ProxyHostFormModal({
             />
           )}
         </div>
+
+        {isL7 && (
+          <label className="flex flex-col gap-1.5">
+            <span className="cyber-label flex items-center gap-2">
+              {t('proxyHosts.healthCheckPathLabel')}
+              <Help text={t('proxyHosts.helpHealthCheckPath')} />
+            </span>
+            <input
+              className="cyber-input font-mono text-sm"
+              placeholder={t('proxyHosts.healthCheckPathPlaceholder')}
+              value={state.healthCheckPath}
+              onChange={(e) => setState((s) => ({ ...s, healthCheckPath: e.target.value }))}
+            />
+            <span className="cyber-mono text-xs" style={{ color: 'var(--color-muted)' }}>
+              {t('proxyHosts.healthCheckPathHint')}
+            </span>
+          </label>
+        )}
 
         {isL7 && (
           <div className="flex flex-col gap-3">

@@ -730,6 +730,8 @@ model ProxyHost {
   http3         Boolean       @default(false) // QUIC + bind quic4@*:443
   enabled       Boolean       @default(true)
   notes         String?
+  /** Путь HTTP GET для проверки upstream (пинг в UI). Пусто = «/». */
+  healthCheckPath String?
 
   // Healthcheck (probing upstream) — обновляется фоновой scheduled-задачей
   healthStatus    HealthStatus @default(UNKNOWN)

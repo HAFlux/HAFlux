@@ -59,6 +59,15 @@ const CreateSchema = z.object({
         .regex(/^[^\r\n]*$/, { message: 'header value must not contain newlines' }),
     )
     .nullish(),
+  /** Путь GET для проверки upstream в панели; пустой/null = корень «/». */
+  healthCheckPath: z
+    .string()
+    .max(512)
+    .regex(/^[^\r\n]*$/)
+    .refine((s) => !s.includes('..'), { message: 'healthCheckPath must not contain ..' })
+    .refine((s) => !/^[a-z]+:/i.test(s.trim()), { message: 'healthCheckPath must be a path, not a URL' })
+    .nullable()
+    .optional(),
 });
 
 const UpdateSchema = CreateSchema.partial().extend({

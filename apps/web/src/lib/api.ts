@@ -156,6 +156,8 @@ export interface ProxyHost {
   http3: boolean;
   enabled: boolean;
   notes: string | null;
+  /** GET path для проверки upstream; null = «/». */
+  healthCheckPath: string | null;
   customHeaders: Record<string, string> | null;
   createdAt: string;
   updatedAt: string;
@@ -184,6 +186,7 @@ export interface CreateProxyHostInput {
   http2?: boolean;
   http3?: boolean;
   notes?: string | null;
+  healthCheckPath?: string | null;
   customHeaders?: Record<string, string> | null;
   accessGroupIds?: string[];
 }
