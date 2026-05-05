@@ -59,4 +59,4 @@ RUN ./node_modules/.bin/prisma generate
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "./node_modules/.bin/prisma db push --skip-generate --accept-data-loss && node dist/main.js"]
+CMD ["sh", "-c", "./node_modules/.bin/prisma db push --accept-data-loss && node dist/main.js"]
