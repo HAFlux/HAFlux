@@ -69,6 +69,8 @@ export default function LoginPage() {
                 <span className="cyber-label">Email</span>
                 <input
                   className="cyber-input"
+                  // biome-ignore lint/a11y/noAutofocus: первое поле логин-формы — корректный кейс автофокуса
+                  autoFocus
                   autoComplete="email"
                   placeholder="admin@haflux.local"
                   required

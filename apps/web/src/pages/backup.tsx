@@ -2,11 +2,14 @@ import { useMutation } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { Modal } from '@/components/modal';
 import { PageHeader } from '@/components/page-header';
+import { useToast } from '@/components/toast';
 import { ApiError, api } from '@/lib/api';
 
 export default function BackupPage() {
   const { t } = useTranslation();
+  const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [restored, setRestored] = useState<Record<string, number> | null>(null);
   const [confirmRestore, setConfirmRestore] = useState<unknown | null>(null);
@@ -22,6 +25,10 @@ export default function BackupPage() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+      toast.success(t('backup.downloadOk'));
+    },
+    onError: (err) => {
+      toast.error(err instanceof ApiError ? err.message : t('common.failed'));
     },
   });
 
@@ -30,6 +37,10 @@ export default function BackupPage() {
     onSuccess: (res) => {
       setRestored(res.restored);
       setConfirmRestore(null);
+      toast.success(t('backup.restoreOk'));
+    },
+    onError: (err) => {
+      toast.error(err instanceof ApiError ? err.message : t('common.failed'));
     },
   });
 
@@ -45,7 +56,7 @@ export default function BackupPage() {
         }
         setConfirmRestore(parsed);
       } catch (err) {
-        alert(err instanceof Error ? err.message : t('common.failed'));
+        toast.error(err instanceof Error ? err.message : t('common.failed'));
       }
     };
     reader.readAsText(file);
@@ -116,37 +127,39 @@ export default function BackupPage() {
         )}
       </div>
 
-      {confirmRestore != null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <div className="cyber-card flex w-full max-w-md flex-col gap-4 px-5 py-5">
-            <span className="cyber-label">{t('backup.confirmTitle')}</span>
-            <p className="text-sm">{t('backup.confirmBody')}</p>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                className="cyber-btn cyber-btn-ghost"
-                onClick={() => setConfirmRestore(null)}
-                disabled={restore.isPending}
-              >
-                {t('actions.cancel')}
-              </button>
-              <button
-                type="button"
-                className="cyber-btn"
-                onClick={() => restore.mutate(confirmRestore)}
-                disabled={restore.isPending}
-              >
-                {restore.isPending ? t('backup.restoring') : t('backup.restoreBtn')}
-              </button>
-            </div>
-            {restore.isError && (
-              <p className="cyber-mono text-sm">
-                ! {restore.error instanceof ApiError ? restore.error.message : t('common.failed')}
-              </p>
-            )}
-          </div>
-        </div>
-      )}
+      <Modal
+        open={confirmRestore != null}
+        onClose={() => !restore.isPending && setConfirmRestore(null)}
+        title={t('backup.confirmTitle')}
+        description={t('backup.confirmBody')}
+        size="sm"
+        footer={
+          <>
+            <button
+              type="button"
+              className="cyber-btn cyber-btn-ghost"
+              onClick={() => setConfirmRestore(null)}
+              disabled={restore.isPending}
+            >
+              {t('actions.cancel')}
+            </button>
+            <button
+              type="button"
+              className="cyber-btn"
+              onClick={() => restore.mutate(confirmRestore)}
+              disabled={restore.isPending}
+            >
+              {restore.isPending ? t('backup.restoring') : t('backup.restoreBtn')}
+            </button>
+          </>
+        }
+      >
+        {restore.isError && (
+          <p className="cyber-mono text-sm">
+            ! {restore.error instanceof ApiError ? restore.error.message : t('common.failed')}
+          </p>
+        )}
+      </Modal>
     </div>
   );
 }

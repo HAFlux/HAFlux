@@ -56,11 +56,14 @@ export default function ClustersPage() {
       )}
 
       {data && data.length === 0 && (
-        <div className="cyber-card px-5 py-5">
+        <div className="cyber-card flex flex-col items-start gap-3 px-5 py-5">
           <span className="cyber-mono text-sm">{t('clusters.noClusters')}</span>
-          <p className="mt-2 text-sm" style={{ color: 'var(--color-muted)' }}>
+          <p className="text-sm" style={{ color: 'var(--color-muted)' }}>
             {t('clusters.noClustersHint')}
           </p>
+          <button type="button" className="cyber-btn" onClick={() => setCreateOpen(true)}>
+            {t('actions.newCluster')}
+          </button>
         </div>
       )}
 

@@ -2,6 +2,8 @@ import clsx from 'clsx';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useToast } from './toast';
+
 interface CopyButtonProps {
   value: string;
   /** Что копировать в clipboard (если отличается от того, что показано). */
@@ -19,6 +21,7 @@ interface CopyButtonProps {
  */
 export function CopyButton({ value, className, iconOnly = false, title }: CopyButtonProps) {
   const { t } = useTranslation();
+  const toast = useToast();
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -47,8 +50,11 @@ export function CopyButton({ value, className, iconOnly = false, title }: CopyBu
       setCopied(true);
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => setCopied(false), 1500);
+      // Тост показываем только в icon-only варианте — иначе кнопка сама
+      // меняет надпись на «Скопировано», и тост был бы дубликатом.
+      if (iconOnly) toast.success(t('actions.copied'));
     } catch {
-      // молча: clipboard может быть недоступен в iframe / некоторых browsers
+      toast.error(t('actions.copyFailed'));
     }
   };
 

@@ -696,7 +696,11 @@ function CertCard({
             style={{
               width: `${pct.toFixed(1)}%`,
               height: '100%',
-              background: renewOverdue ? '#dc2626' : renewSoon ? '#eab308' : 'var(--color-fg)',
+              background: renewOverdue
+                ? 'var(--color-danger)'
+                : renewSoon
+                  ? 'var(--color-warn)'
+                  : 'var(--color-fg)',
               transition: 'width 200ms ease',
             }}
           />

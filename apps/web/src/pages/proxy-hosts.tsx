@@ -8,6 +8,7 @@ import { Help } from '@/components/help';
 import { Modal } from '@/components/modal';
 import { PageHeader } from '@/components/page-header';
 import { PanelLoader } from '@/components/panel-loader';
+import { useToast } from '@/components/toast';
 import {
   type AccessGroupSummary,
   ApiError,
@@ -21,6 +22,7 @@ import {
 export default function ProxyHostsPage() {
   const { t } = useTranslation();
   const qc = useQueryClient();
+  const toast = useToast();
 
   const clustersQ = useQuery({ queryKey: ['clusters'], queryFn: () => api.clusters.list() });
   const certsQ = useQuery({ queryKey: ['certs'], queryFn: () => api.certificates.list() });
@@ -63,15 +65,30 @@ export default function ProxyHostsPage() {
 
   const remove = useMutation({
     mutationFn: (id: string) => api.proxyHosts.delete(id),
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
+      const domain = confirmDelete?.domain;
       setConfirmDelete(null);
       qc.invalidateQueries({ queryKey: ['proxy-hosts', activeClusterId] });
+      toast.success(t('proxyHosts.toastDeleted', { domain: domain ?? id }));
+    },
+    onError: (err) => {
+      toast.error(err instanceof ApiError ? err.message : t('common.failed'));
     },
   });
 
   const toggleEnabled = useMutation({
     mutationFn: (host: ProxyHost) => api.proxyHosts.update(host.id, { enabled: !host.enabled }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['proxy-hosts', activeClusterId] }),
+    onSuccess: (updated) => {
+      qc.invalidateQueries({ queryKey: ['proxy-hosts', activeClusterId] });
+      toast.success(
+        updated.enabled
+          ? t('proxyHosts.toastEnabled', { domain: updated.domain })
+          : t('proxyHosts.toastDisabled', { domain: updated.domain }),
+      );
+    },
+    onError: (err) => {
+      toast.error(err instanceof ApiError ? err.message : t('common.failed'));
+    },
   });
 
   return (
@@ -110,11 +127,14 @@ export default function ProxyHostsPage() {
       {hostsQ.isLoading && <PanelLoader message={t('proxyHosts.loadingHosts')} />}
 
       {hostsQ.data && hostsQ.data.length === 0 && (
-        <div className="cyber-card px-5 py-5">
+        <div className="cyber-card flex flex-col items-start gap-3 px-5 py-5">
           <span className="cyber-mono text-sm">{t('proxyHosts.noHosts')}</span>
-          <p className="mt-2 text-sm" style={{ color: 'var(--color-muted)' }}>
+          <p className="text-sm" style={{ color: 'var(--color-muted)' }}>
             {t('proxyHosts.noHostsHint', { addHost: t('actions.newProxyHost') })}
           </p>
+          <button type="button" className="cyber-btn" onClick={() => setCreateOpen(true)}>
+            {t('actions.newProxyHost')}
+          </button>
         </div>
       )}
 
@@ -440,14 +460,26 @@ function ProxyHostStatsPanel({ hostId }: { hostId: string }) {
         <Metric label={t('proxyHosts.metricTotal')} value={s?.total ?? 0} />
       </div>
       <div className="grid grid-cols-4 gap-3">
-        <StatusMetric label={t('proxyHosts.status2xx')} value={s?.status2xx ?? 0} color="#16a34a" />
+        <StatusMetric
+          label={t('proxyHosts.status2xx')}
+          value={s?.status2xx ?? 0}
+          color="var(--color-healthy)"
+        />
         <StatusMetric
           label={t('proxyHosts.status3xx')}
           value={s?.status3xx ?? 0}
           color="var(--color-muted)"
         />
-        <StatusMetric label={t('proxyHosts.status4xx')} value={s?.status4xx ?? 0} color="#eab308" />
-        <StatusMetric label={t('proxyHosts.status5xx')} value={s?.status5xx ?? 0} color="#dc2626" />
+        <StatusMetric
+          label={t('proxyHosts.status4xx')}
+          value={s?.status4xx ?? 0}
+          color="var(--color-warn)"
+        />
+        <StatusMetric
+          label={t('proxyHosts.status5xx')}
+          value={s?.status5xx ?? 0}
+          color="var(--color-danger)"
+        />
       </div>
       <div className="flex flex-col gap-1.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -525,9 +557,9 @@ function ProxyHostStatsPanel({ hostId }: { hostId: string }) {
             {l.map((line) => {
               const c =
                 line.status >= 500
-                  ? '#dc2626'
+                  ? 'var(--color-danger)'
                   : line.status >= 400
-                    ? '#eab308'
+                    ? 'var(--color-warn)'
                     : line.status >= 200
                       ? 'var(--color-fg)'
                       : 'var(--color-muted)';
@@ -595,9 +627,21 @@ function StatusMetric({ label, value, color }: { label: string; value: number; c
 function HealthDot({ status }: { status: ProxyHost['healthStatus'] }) {
   const { t } = useTranslation();
   const map: Record<ProxyHost['healthStatus'], { labelKey: string; bg: string; border: string }> = {
-    HEALTHY: { labelKey: 'proxyHosts.healthHealthy', bg: '#16a34a', border: '#16a34a' },
-    DEGRADED: { labelKey: 'proxyHosts.healthDegraded', bg: '#eab308', border: '#eab308' },
-    UNHEALTHY: { labelKey: 'proxyHosts.healthDown', bg: '#dc2626', border: '#dc2626' },
+    HEALTHY: {
+      labelKey: 'proxyHosts.healthHealthy',
+      bg: 'var(--color-healthy)',
+      border: 'var(--color-healthy)',
+    },
+    DEGRADED: {
+      labelKey: 'proxyHosts.healthDegraded',
+      bg: 'var(--color-warn)',
+      border: 'var(--color-warn)',
+    },
+    UNHEALTHY: {
+      labelKey: 'proxyHosts.healthDown',
+      bg: 'var(--color-danger)',
+      border: 'var(--color-danger)',
+    },
     UNKNOWN: {
       labelKey: 'proxyHosts.healthUnknown',
       bg: 'transparent',
