@@ -47,7 +47,7 @@
     "@nestjs/testing": "11.1.19",
     "@types/node": "22.10.5",
     "@types/passport-jwt": "4.0.1",
-    "typescript": "5.7.2",
+    "typescript": "5.9.3",
     "vitest": "2.1.8"
   }
 }
