@@ -8,6 +8,21 @@ updates:
       nestjs: { patterns: ["@nestjs/*"] }
       heroui: { patterns: ["@heroui/*"] }
       tanstack: { patterns: ["@tanstack/*"] }
+    # Major-апгрейды этих пакетов требуют ручной миграции (TS 6 ломает
+    # @types/cascading typings, Prisma 7 — schema-tooling, vitest 4 — API,
+    # react-router-dom 7 — data router / Suspense). Снимать ignore точечно,
+    # когда планируется миграция отдельным PR.
+    ignore:
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+      - dependency-name: prisma
+        update-types: [version-update:semver-major]
+      - dependency-name: "@prisma/client"
+        update-types: [version-update:semver-major]
+      - dependency-name: vitest
+        update-types: [version-update:semver-major]
+      - dependency-name: react-router-dom
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: docker
     directory: /apps/api
