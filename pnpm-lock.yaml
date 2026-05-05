@@ -69,8 +69,8 @@ importers:
         specifier: 0.14.1
         version: 0.14.1
       ioredis:
-        specifier: 5.4.2
-        version: 5.4.2
+        specifier: 5.10.1
+        version: 5.10.1
       passport:
         specifier: 0.7.0
         version: 0.7.0
@@ -940,8 +940,8 @@ packages:
   '@internationalized/string@3.2.8':
     resolution: {integrity: sha512-NdbMQUSfXLYIQol5VyMtinm9pZDciiMfN7RtmSuSB78io1hqwJ0naYfxyW6vgxWBkzWymQa/3uLDlbfmshtCaA==}
 
-  '@ioredis/commands@1.7.0':
-    resolution: {integrity: sha512-5E3KP12g1Po3xMdaym6N3VBibWAH/vv7XxGl8M20KQyPfZWB7sAhLb90+9IX/WJWFHuRFai5caz+DXKQbLI51g==}
+  '@ioredis/commands@1.5.1':
+    resolution: {integrity: sha512-JH8ZL/ywcJyR9MmJ5BNqZllXNZQqQbnVZOqpPQqE1vHiFgAw4NHbvE0FOduNU8IX9babitBT46571OnPTT0Zcw==}
 
   '@isaacs/cliui@9.0.0':
     resolution: {integrity: sha512-AokJm4tuBHillT+FpMtxQ60n8ObyXBatq7jD2/JA9dxbDDokKQm8KMht5ibGzLVU9IJDIKK4TPKgMHEYMn3lMg==}
@@ -2629,8 +2629,8 @@ packages:
   intl-messageformat@10.7.18:
     resolution: {integrity: sha512-m3Ofv/X/tV8Y3tHXLohcuVuhWKo7BBq62cqY15etqmLxg2DZ34AGGgQDeR+SCta2+zICb1NX83af0GJmbQ1++g==}
 
-  ioredis@5.4.2:
-    resolution: {integrity: sha512-0SZXGNGZ+WzISQ67QDyZ2x0+wVxjjUndtD8oSeik/4ajifeiRufed8fCb8QW8VMyi4MXcS+UO1k/0NGhvq1PAg==}
+  ioredis@5.10.1:
+    resolution: {integrity: sha512-HuEDBTI70aYdx1v6U97SbNx9F1+svQKBDo30o0b9fw055LMepzpOOd0Ccg9Q6tbqmBSJaMuY0fB7yw9/vjBYCA==}
     engines: {node: '>=12.22.0'}
 
   ipaddr.js@2.3.0:
@@ -4449,7 +4449,7 @@ snapshots:
     dependencies:
       '@swc/helpers': 0.5.21
 
-  '@ioredis/commands@1.7.0': {}
+  '@ioredis/commands@1.5.1': {}
 
   '@isaacs/cliui@9.0.0': {}
 
@@ -5652,7 +5652,7 @@ snapshots:
   bullmq@5.34.10:
     dependencies:
       cron-parser: 4.9.0
-      ioredis: 5.4.2
+      ioredis: 5.10.1
       msgpackr: 1.11.10
       node-abort-controller: 3.1.1
       semver: 7.7.4
@@ -6218,9 +6218,9 @@ snapshots:
       '@formatjs/icu-messageformat-parser': 2.11.4
       tslib: 2.8.1
 
-  ioredis@5.4.2:
+  ioredis@5.10.1:
     dependencies:
-      '@ioredis/commands': 1.7.0
+      '@ioredis/commands': 1.5.1
       cluster-key-slot: 1.1.2
       debug: 4.4.3
       denque: 2.1.0
