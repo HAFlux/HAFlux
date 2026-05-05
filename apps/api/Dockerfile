@@ -27,11 +27,14 @@ COPY apps/web ./apps/web
 RUN pnpm install --frozen-lockfile --prefer-offline
 
 # Build: contracts → web (Vite SPA) → prisma generate → api (Nest)
+# pnpm 10 disabled the legacy deploy by default (ERR_PNPM_DEPLOY_NONINJECTED_WORKSPACE).
+# Полный переход на injected workspace-deps потребует переписать workspace-ссылки;
+# `--legacy` сохраняет прежнее поведение и работает с нашими `workspace:*` ссылками.
 RUN pnpm --filter @haflux/contracts build \
  && pnpm --filter @haflux/web build \
  && pnpm --filter @haflux/api exec prisma generate \
  && pnpm --filter @haflux/api build \
- && pnpm --filter @haflux/api deploy --prod /out
+ && pnpm --filter @haflux/api deploy --legacy --prod /out
 
 ## ─── Runtime ─────────────────────────────────────────────────────────────
 FROM node:22-alpine AS runtime
