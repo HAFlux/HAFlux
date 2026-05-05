@@ -88,7 +88,10 @@ export function buildZip(entries: ZipEntry[]): Buffer {
     central.writeUInt16LE(0, 32); // comment length
     central.writeUInt16LE(0, 34); // disk start
     central.writeUInt16LE(0, 36); // internal attrs
-    central.writeUInt32LE(0o100644 << 16, 38); // external attrs (regular file 0644)
+    // external attrs: regular file 0644, packed in upper 16 bits.
+    // <<16 в JS даёт signed-int — overflow до отрицательного, writeUInt32LE
+    // упадёт ERR_OUT_OF_RANGE. Поэтому * 0x10000.
+    central.writeUInt32LE(0o100644 * 0x10000, 38);
     central.writeUInt32LE(offset, 42);
     centralChunks.push(central, nameBuf);
 
