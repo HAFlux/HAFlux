@@ -59,6 +59,11 @@ services:
     ports:
       # api слушает локально :3000. HAProxy на host network проксирует на 127.0.0.1:3000.
       - "127.0.0.1:3000:3000"
+    extra_hosts:
+      # health-probe внутри контейнера должен видеть host loopback там же,
+      # где его видит HAProxy (network_mode: host). Без extra_hosts 127.0.0.1
+      # ProxyHost'а указывает в самого api (пустота).
+      - "host.docker.internal:host-gateway"
     volumes:
       # api пишет конфиг сюда (rw); haproxy читает то же самое (ro)
       - ./haproxy-data:/haproxy-data

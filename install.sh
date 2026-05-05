@@ -343,6 +343,11 @@ services:
     networks: [internal, edge]
     ports:
       - "127.0.0.1:${API_PORT}:${API_PORT}"
+    # api крутится в своей network namespace; host.docker.internal -> host-gateway,
+    # чтобы health-probe мог достучаться до 127.0.0.1 хоста (где слушают upstream'ы
+    # юзера и HAProxy). Без этого 127.0.0.1 в ProxyHost ведёт в пустоту контейнера.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./haproxy-data:/haproxy-data
       - /var/run/docker.sock:/var/run/docker.sock:ro
