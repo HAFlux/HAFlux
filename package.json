@@ -1,6 +1,6 @@
 {
   "name": "haflux",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "private": true,
   "description": "Multi-HAProxy control plane: visual management for HAProxy clusters via Data Plane API.",
   "license": "AGPL-3.0-only",
