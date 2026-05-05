@@ -563,6 +563,19 @@ function UploadSection({ onUploaded }: { onUploaded: () => void }) {
 
 // ─── Certificates list ────────────────────────────────────────────────
 
+/** Сохранить blob с server-supplied именем файла либо fallback'ом. */
+function saveBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // revoke в следующем тике, чтобы Chrome успел стартовать download
+  setTimeout(() => URL.revokeObjectURL(url), 250);
+}
+
 function CertCard({
   cert,
   isSelected,
@@ -582,6 +595,12 @@ function CertCard({
   const renew = useMutation({
     mutationFn: () => api.certificates.renew(cert.id),
     onSuccess: onChange,
+  });
+  const exportOne = useMutation({
+    mutationFn: () => api.certificates.exportOne(cert.id),
+    onSuccess: ({ blob, filename }) => {
+      saveBlob(blob, filename ?? `${cert.commonName.replace(/[^a-zA-Z0-9._-]/g, '_')}.zip`);
+    },
   });
 
   const issued = new Date(cert.notBefore);
@@ -636,6 +655,18 @@ function CertCard({
           }}
         >
           {renew.isPending ? t('actions.renewing') : t('actions.renew')}
+        </button>
+        <button
+          type="button"
+          className="cyber-btn cyber-btn-ghost"
+          disabled={exportOne.isPending}
+          title={t('certificates.exportOneTitle')}
+          onClick={(e) => {
+            e.preventDefault();
+            exportOne.mutate();
+          }}
+        >
+          {exportOne.isPending ? t('actions.exporting') : t('actions.exportZip')}
         </button>
         <button
           type="button"
@@ -718,17 +749,42 @@ function CertificatesSection({
       onChange();
     },
   });
+  const exportAll = useMutation({
+    mutationFn: () => api.certificates.exportAll(),
+    onSuccess: ({ blob, filename }) => {
+      saveBlob(
+        blob,
+        filename ??
+          `haflux-certs-${new Date().toISOString().replace(/[:T]/g, '-').slice(0, 16)}.zip`,
+      );
+    },
+  });
 
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <span className="cyber-label">{t('certificates.issuedCertsKicker')}</span>
-        <span className="cyber-mono text-xs" style={{ color: 'var(--color-muted)' }}>
-          {t('certificates.totalCerts', {
-            total: certificates.length,
-            selected: selectedId ? '1' : '0',
-          })}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="cyber-mono text-xs" style={{ color: 'var(--color-muted)' }}>
+            {t('certificates.totalCerts', {
+              total: certificates.length,
+              selected: selectedId ? '1' : '0',
+            })}
+          </span>
+          {certificates.length > 0 && (
+            <button
+              type="button"
+              className="cyber-btn cyber-btn-ghost"
+              onClick={() => exportAll.mutate()}
+              disabled={exportAll.isPending}
+              title={t('certificates.exportAllTitle')}
+            >
+              {exportAll.isPending
+                ? t('actions.exporting')
+                : t('certificates.exportAll', { count: certificates.length })}
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (

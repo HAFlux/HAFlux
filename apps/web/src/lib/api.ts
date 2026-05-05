@@ -47,6 +47,38 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Скачать защищённый бинарный ресурс под текущим JWT и вернуть Blob +
+ * имя файла из Content-Disposition (если сервер прислал). Используется
+ * экспортом сертификатов: ссылку <a download> нельзя прицепить заголовок
+ * Authorization, так что качаем через fetch и создаём object URL.
+ */
+async function downloadBlob(path: string): Promise<{ blob: Blob; filename: string | null }> {
+  const headers = new Headers();
+  const token = localStorage.getItem('haflux:access-token');
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  const res = await fetch(`${API_BASE}${path}`, { headers });
+  if (!res.ok) {
+    if (res.status === 401) handleUnauthorized(path);
+    let body: unknown;
+    try {
+      body = await res.json();
+    } catch {
+      body = undefined;
+    }
+    const rawMsg =
+      body && typeof body === 'object' && 'message' in body
+        ? (body as { message?: unknown }).message
+        : undefined;
+    const message = typeof rawMsg === 'string' && rawMsg.length > 0 ? rawMsg : res.statusText;
+    throw new ApiError(res.status, message, body);
+  }
+  const cd = res.headers.get('content-disposition') ?? '';
+  const m = cd.match(/filename\*?=(?:UTF-8''|")?([^";]+)"?/i);
+  const filename = m?.[1] ? decodeURIComponent(m[1]) : null;
+  return { blob: await res.blob(), filename };
+}
+
 async function request<T>(
   path: string,
   init: RequestInit & { auth?: boolean | string } = {},
@@ -379,6 +411,12 @@ export const api = {
         body: JSON.stringify(input),
         auth: true,
       }),
+
+    /** Скачать один сертификат как ZIP — возвращает Blob, готовый для FileSaver. */
+    exportOne: (id: string) => downloadBlob(`/certificates/${id}/export`),
+
+    /** Скачать все сертификаты разом — Blob (`application/zip`). */
+    exportAll: () => downloadBlob('/certificates/export/all'),
   },
   proxyHosts: {
     list: (clusterId: string) =>

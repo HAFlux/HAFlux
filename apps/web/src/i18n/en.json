@@ -31,6 +31,11 @@
     "add": "Add",
     "remove": "Remove",
     "close": "Close",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyLink": "Copy link",
+    "exportZip": "Export ZIP",
+    "exporting": "Exporting…",
     "newCluster": "+ New cluster",
     "newProxyHost": "+ Add proxy host",
     "saving": "Saving…",
@@ -198,6 +203,9 @@
     "sanLine": "SAN [{{list}}]",
     "renewOnlyAcme": "Only ACME certs can be renewed",
     "renewNow": "Renew now",
+    "exportOneTitle": "Download fullchain.pem + privkey.pem as a ZIP archive",
+    "exportAllTitle": "Download every certificate as a single ZIP archive",
+    "exportAll": "Export all ({{count}}) ZIP",
     "selectionNote": "Selection persists in this view. Frontend bind picker (settings → frontends) will use it once the integration ships."
   },
   "proxyHosts": {

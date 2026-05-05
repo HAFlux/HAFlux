@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AcmeService } from './acme.service';
 import { CloudflareDnsProvider } from './cloudflare.provider';
 import { CryptoService } from './crypto.service';
+import { buildZip, safeName, shortHash, splitPem } from './zip';
 
 @Injectable()
 export class CertificatesService {
@@ -196,6 +197,85 @@ export class CertificatesService {
       },
       select: { id: true, commonName: true, sans: true, notAfter: true, source: true },
     });
+  }
+
+  /**
+   * Экспорт одного сертификата: возвращает PEM cert+key (как храним) либо
+   * пару отдельных fullchain/privkey. Обновляет mtime файла = notBefore,
+   * чтобы в zip'е/выгрузке был осмысленный timestamp.
+   */
+  async exportCertificate(id: string): Promise<{
+    commonName: string;
+    fullchainPem: string;
+    privkeyPem: string;
+    notBefore: Date;
+  }> {
+    const orgId = await this.defaultOrgId();
+    const cert = await this.prisma.certificate.findFirst({ where: { id, orgId } });
+    if (!cert) throw new AppException(ErrorCode.CERT_NOT_FOUND, 'Certificate not found', 404);
+    const pem = this.crypto.decryptToString(Buffer.from(cert.encryptedPemBlob));
+    const { fullchain, privkey } = splitPem(pem);
+    return {
+      commonName: cert.commonName,
+      fullchainPem: fullchain,
+      privkeyPem: privkey,
+      notBefore: cert.notBefore,
+    };
+  }
+
+  /**
+   * Экспорт всех сертификатов организации в один ZIP.
+   * Раскладка:
+   *   <commonName>__<hash>/fullchain.pem
+   *   <commonName>__<hash>/privkey.pem
+   *   <commonName>__<hash>/cert-info.txt   — issuer, SANs, validity
+   *   README.txt                            — общий манифест
+   * Хеш в имени папки нужен на случай нескольких сертов с одним CN
+   * (например, после renew — старый и новый, пока старый не удалён).
+   */
+  async exportAllAsZip(): Promise<{ zip: Buffer; count: number }> {
+    const orgId = await this.defaultOrgId();
+    const certs = await this.prisma.certificate.findMany({
+      where: { orgId },
+      orderBy: { commonName: 'asc' },
+    });
+    if (certs.length === 0) {
+      throw new AppException(ErrorCode.CERT_NOT_FOUND, 'No certificates to export', 404);
+    }
+
+    const entries: { name: string; data: Buffer; mtime: number }[] = [];
+    const lines: string[] = [
+      'HAFlux certificate export',
+      `Generated: ${new Date().toISOString()}`,
+      `Total: ${certs.length}`,
+      '',
+    ];
+
+    for (const c of certs) {
+      const pem = this.crypto.decryptToString(Buffer.from(c.encryptedPemBlob));
+      const { fullchain, privkey } = splitPem(pem);
+      const dir = `${safeName(c.commonName)}__${shortHash(c.id)}`;
+      const mtime = new Date(c.notBefore).getTime();
+      entries.push({ name: `${dir}/fullchain.pem`, data: Buffer.from(fullchain, 'utf8'), mtime });
+      entries.push({ name: `${dir}/privkey.pem`, data: Buffer.from(privkey, 'utf8'), mtime });
+      const info =
+        `commonName: ${c.commonName}\n` +
+        `sans: ${c.sans.join(', ')}\n` +
+        `issuer: ${c.issuer}\n` +
+        `source: ${c.source}\n` +
+        `notBefore: ${c.notBefore.toISOString()}\n` +
+        `notAfter:  ${c.notAfter.toISOString()}\n` +
+        `fingerprintSha256: ${c.fingerprintSha256}\n`;
+      entries.push({ name: `${dir}/cert-info.txt`, data: Buffer.from(info, 'utf8'), mtime });
+      lines.push(`- ${dir}/  (${c.commonName}, до ${c.notAfter.toISOString().slice(0, 10)})`);
+    }
+    entries.unshift({
+      name: 'README.txt',
+      data: Buffer.from(`${lines.join('\n')}\n`, 'utf8'),
+      mtime: Date.now(),
+    });
+
+    return { zip: buildZip(entries), count: certs.length };
   }
 
   private parseLeafCert(pem: string): {
