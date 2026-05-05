@@ -76,7 +76,7 @@ export default function ClustersPage() {
                 <span className="cyber-tag">{cluster.mode}</span>
               </div>
               <div
-                className="cyber-mono mt-3 grid grid-cols-3 gap-2 text-xs"
+                className="cyber-mono mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3"
                 style={{ color: 'var(--color-muted)' }}
               >
                 <div className="flex flex-col">
@@ -98,9 +98,9 @@ export default function ClustersPage() {
                   </span>
                 </div>
               </div>
-              <div className="mt-3 flex items-center justify-between gap-3">
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                 <span
-                  className="cyber-mono block truncate text-xs"
+                  className="cyber-mono block min-w-0 truncate text-xs"
                   style={{ color: 'var(--color-muted)' }}
                   title={cluster.id}
                 >

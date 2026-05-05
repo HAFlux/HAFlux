@@ -13,12 +13,12 @@ export function PageHeader({
   right?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-4">
-      <div className="flex flex-col gap-2">
+    <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:gap-4">
+      <div className="flex min-w-0 flex-col gap-2">
         <span className="cyber-label inline-block min-h-[1.25em]">
           <TerminalTypewriter text={kicker} charDelayMs={20} />
         </span>
-        <h1 className="cyber-heading inline-block min-h-[1.2em] text-3xl">
+        <h1 className="cyber-heading inline-block min-h-[1.2em] text-2xl sm:text-3xl">
           <TerminalTypewriter text={title} startDelayMs={280} charDelayMs={42} />
         </h1>
         {subtitle ? (
@@ -27,7 +27,9 @@ export function PageHeader({
           </p>
         ) : null}
       </div>
-      {right}
+      {right ? (
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">{right}</div>
+      ) : null}
     </div>
   );
 }

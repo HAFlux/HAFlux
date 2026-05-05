@@ -71,12 +71,12 @@ export function Modal({
       >
         {/* Header — фиксированный, не скроллится */}
         <div
-          className="flex shrink-0 items-start justify-between gap-4 px-6 py-4"
+          className="flex shrink-0 items-start justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-6 sm:py-4"
           style={{ borderBottom: '1px solid var(--color-separator)' }}
         >
-          <div className="flex flex-col gap-1">
+          <div className="flex min-w-0 flex-col gap-1">
             <span className="cyber-label">{'// modal'}</span>
-            <h2 className="cyber-heading text-lg">{title}</h2>
+            <h2 className="cyber-heading text-base sm:text-lg">{title}</h2>
             {description && (
               <p className="text-sm" style={{ color: 'var(--color-muted)' }}>
                 {description}
@@ -95,12 +95,13 @@ export function Modal({
         </div>
 
         {/* Body — скроллится при overflow */}
-        <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">{children}</div>
 
-        {/* Footer — sticky внизу, не скроллится */}
+        {/* Footer — sticky внизу, не скроллится. На мобильном — кнопки во всю ширину
+             вертикальным стеком, чтобы Cancel/Save не толпились. */}
         {footer && (
           <div
-            className="flex shrink-0 items-center justify-end gap-2 px-6 py-4"
+            className="flex shrink-0 flex-col-reverse items-stretch gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-6 sm:py-4"
             style={{ borderTop: '1px solid var(--color-separator)' }}
           >
             {footer}

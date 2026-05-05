@@ -283,6 +283,8 @@ function ProxyHostRow({
     >
       <div className="flex flex-col gap-4 min-[900px]:grid min-[900px]:grid-cols-[1fr_auto] min-[900px]:items-start">
         <div className="min-w-0 flex flex-col gap-1.5">
+          {/* Domain + copy + (на десктопе) → target. На мобильном target уезжает
+               на следующую строку — иначе он зажимается между доменом и тагами. */}
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <HealthDot status={host.healthStatus} />
             {isL7 ? (
@@ -290,20 +292,25 @@ function ProxyHostRow({
                 href={publicUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="cyber-mono text-sm font-medium underline decoration-dotted underline-offset-4 hover:opacity-80"
+                className="cyber-mono min-w-0 break-all text-sm font-medium underline decoration-dotted underline-offset-4 hover:opacity-80"
                 title={publicUrl}
               >
                 {host.ssl ? 'https://' : 'http://'}
                 {host.domain}
               </a>
             ) : (
-              <span className="cyber-mono text-sm font-medium">
+              <span className="cyber-mono min-w-0 break-all text-sm font-medium">
                 <span className="cyber-tag">{host.forwardScheme}</span> {host.domain}
               </span>
             )}
             <CopyButton value={publicUrl} iconOnly className="cyber-btn-sm" />
-            <span style={{ color: 'var(--color-muted)' }}>→</span>
-            <span className="cyber-mono text-sm" style={{ color: 'var(--color-muted)' }}>
+            <span className="hidden sm:inline" style={{ color: 'var(--color-muted)' }}>
+              →
+            </span>
+            <span
+              className="cyber-mono hidden min-w-0 break-all text-sm sm:inline"
+              style={{ color: 'var(--color-muted)' }}
+            >
               {target}
             </span>
             {!isL7 && host.listenPort != null ? (
@@ -317,6 +324,14 @@ function ProxyHostRow({
                 {host.healthLatencyMs != null ? `${host.healthLatencyMs}ms` : ''}
               </span>
             )}
+          </div>
+          {/* Mobile-only target line — sm и выше прячем (он уже в строке с доменом). */}
+          <div
+            className="cyber-mono flex min-w-0 items-center gap-1 break-all text-xs sm:hidden"
+            style={{ color: 'var(--color-muted)' }}
+          >
+            <span aria-hidden>↳</span>
+            <span>{target}</span>
           </div>
           <div className="flex flex-wrap gap-2">
             {isL7 && host.ssl && <span className="cyber-tag">{t('proxyHosts.tagTls')}</span>}
@@ -348,7 +363,10 @@ function ProxyHostRow({
             {!host.enabled && <span className="cyber-tag">{t('proxyHosts.tagDisabled')}</span>}
           </div>
         </div>
-        <div className="flex min-w-0 flex-wrap items-start justify-end gap-2">
+        {/* На мобильном кнопок 5 — пускаем их в grid 2x?, чтобы каждая была
+             tap-friendly шириной (44+ px по высоте, ширина — половина ряда).
+             С min-[900px] возвращаемся к flex-wrap справа. */}
+        <div className="grid w-full grid-cols-2 gap-2 min-[640px]:flex min-[640px]:flex-wrap min-[640px]:items-start min-[640px]:justify-end min-[640px]:w-auto">
           <button
             type="button"
             className="cyber-btn cyber-btn-ghost"
