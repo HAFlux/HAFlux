@@ -27,7 +27,7 @@
     "compose:dev": "docker compose -f deploy/docker/compose.yml -f deploy/docker/compose.dev.yml --env-file deploy/docker/.env up --build"
   },
   "devDependencies": {
-    "@biomejs/biome": "1.9.4",
+    "@biomejs/biome": "2.4.14",
     "typescript": "5.7.2"
   },
   "pnpm": {
