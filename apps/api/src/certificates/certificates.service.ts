@@ -3,7 +3,7 @@ import { AppException, ErrorCode } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
 import { AcmeService } from './acme.service';
 import { CloudflareDnsProvider } from './cloudflare.provider';
-import { CryptoService } from './crypto.service';
+import { CryptoService, toBytes } from './crypto.service';
 import { buildZip, safeName, shortHash, splitPem } from './zip';
 
 @Injectable()
@@ -61,7 +61,7 @@ export class CertificatesService {
       orgId,
       kind: 'CLOUDFLARE' as const,
       name: input.name,
-      encryptedCredentials: credsBlob,
+      encryptedCredentials: toBytes(credsBlob),
       zonesCache: verified.zones,
     };
 
@@ -151,7 +151,7 @@ export class CertificatesService {
         notAfter: result.notAfter,
         fingerprintSha256: fingerprint,
         source: 'ACME',
-        encryptedPemBlob,
+        encryptedPemBlob: toBytes(encryptedPemBlob),
       },
     });
 
@@ -193,7 +193,7 @@ export class CertificatesService {
         notAfter: cert.notAfter,
         fingerprintSha256: fingerprintHex,
         source: 'UPLOAD',
-        encryptedPemBlob,
+        encryptedPemBlob: toBytes(encryptedPemBlob),
       },
       select: { id: true, commonName: true, sans: true, notAfter: true, source: true },
     });

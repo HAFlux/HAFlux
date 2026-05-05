@@ -3,9 +3,10 @@ generator client {
   previewFeatures = ["postgresqlExtensions"]
 }
 
+// Prisma 7: connection URL живёт в prisma.config.ts (для CLI: migrate / db push)
+// и в PrismaClient (datasourceUrl, см. prisma.service.ts) — а не в schema.
 datasource db {
   provider   = "postgresql"
-  url        = env("DATABASE_URL")
   extensions = [citext]
 }
 
