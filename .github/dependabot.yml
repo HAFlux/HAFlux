@@ -23,6 +23,8 @@ updates:
         update-types: [version-update:semver-major]
       - dependency-name: react-router-dom
         update-types: [version-update:semver-major]
+      - dependency-name: vite
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: docker
     directory: /apps/api
