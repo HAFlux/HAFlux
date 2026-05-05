@@ -1,3 +1,5 @@
+import { ToastProvider } from '@/components/toast';
+
 export function Provider({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+  return <ToastProvider>{children}</ToastProvider>;
 }

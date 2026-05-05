@@ -25,6 +25,14 @@
   --color-separator: rgba(0, 0, 0, 0.18);
   --color-accent: #000000;
 
+  /* Семантические цвета — единственное место, где интерфейс уходит из
+   * монохрома. Используются только для health-индикаторов и счётчиков
+   * статус-кодов: зелёный/жёлтый/красный — слишком устоявшийся UX-паттерн,
+   * чтобы заменять его на оттенки серого. Все остальные элементы — fg/muted. */
+  --color-healthy: #16a34a;
+  --color-warn: #d97706;
+  --color-danger: #dc2626;
+
   /* Motion — единая «плавность» интерфейса */
   --motion-ease-out: cubic-bezier(0.33, 1, 0.68, 1);
   --motion-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
@@ -40,6 +48,10 @@
   --color-muted: #8f8f8f;
   --color-separator: rgba(255, 255, 255, 0.18);
   --color-accent: #ffffff;
+  /* В dark-теме чуть светлее, чтобы хватило контраста на чёрном фоне. */
+  --color-healthy: #22c55e;
+  --color-warn: #eab308;
+  --color-danger: #ef4444;
 }
 
 html,

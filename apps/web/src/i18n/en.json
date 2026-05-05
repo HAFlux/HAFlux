@@ -34,6 +34,9 @@
     "copy": "Copy",
     "copied": "Copied",
     "copyLink": "Copy link",
+    "copyFailed": "Copy failed",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
     "exportZip": "Export ZIP",
     "exporting": "Exporting…",
     "newCluster": "+ New cluster",
@@ -222,6 +225,9 @@
     "editHostDesc": "Update routing for {{domain}}.",
     "deleteModalTitle": "Delete proxy host",
     "deleteModalDesc": "Routing for {{domain}} will be removed. Existing connections may drop.",
+    "toastEnabled": "Enabled {{domain}}",
+    "toastDisabled": "Disabled {{domain}}",
+    "toastDeleted": "Deleted {{domain}}",
     "domainLabel": "Domain",
     "domainHint": "FQDN. Wildcard *.example.com is allowed.",
     "schemeLabel": "Scheme",
@@ -407,7 +413,9 @@
     "restoring": "Restoring...",
     "confirmTitle": "Confirm restore",
     "confirmBody": "All current data will be erased and replaced with the backup. This is irreversible.",
-    "invalidFile": "File is not a valid HPM backup."
+    "invalidFile": "File is not a valid HPM backup.",
+    "downloadOk": "Backup downloaded",
+    "restoreOk": "Backup restored"
   },
   "help": {
     "kicker": "// Help",

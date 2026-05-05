@@ -3,11 +3,14 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { PageHeader } from '@/components/page-header';
+import { PasswordInput } from '@/components/password-input';
+import { useToast } from '@/components/toast';
 import { ApiError, api } from '@/lib/api';
 
 export default function ProfilePage() {
   const { t } = useTranslation();
   const qc = useQueryClient();
+  const toast = useToast();
   const meQ = useQuery({ queryKey: ['me'], queryFn: () => api.me.get() });
 
   const [email, setEmail] = useState('');
@@ -36,11 +39,19 @@ export default function ProfilePage() {
       if (newPassword) body.newPassword = newPassword;
       return api.me.update(body);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       qc.invalidateQueries({ queryKey: ['me'] });
+      toast.success(
+        data.passwordChanged
+          ? `${t('profile.saved')} ${t('profile.savedReLogin')}`
+          : t('profile.saved'),
+      );
+    },
+    onError: (err) => {
+      toast.error(err instanceof ApiError ? err.message : 'Update failed');
     },
   });
 
@@ -111,9 +122,7 @@ export default function ProfilePage() {
           />
 
           <Field label={t('profile.currentPasswordLabel')}>
-            <input
-              className="cyber-input"
-              type="password"
+            <PasswordInput
               autoComplete="current-password"
               placeholder={t('profile.currentPasswordHint')}
               value={currentPassword}
@@ -124,9 +133,7 @@ export default function ProfilePage() {
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Field label={t('profile.newPasswordLabel')}>
-              <input
-                className="cyber-input"
-                type="password"
+              <PasswordInput
                 autoComplete="new-password"
                 placeholder={t('profile.newPasswordHint')}
                 value={newPassword}
@@ -145,9 +152,7 @@ export default function ProfilePage() {
               )}
             </Field>
             <Field label={t('profile.confirmPasswordLabel')}>
-              <input
-                className="cyber-input"
-                type="password"
+              <PasswordInput
                 autoComplete="new-password"
                 placeholder={t('profile.confirmPasswordHint')}
                 value={confirmPassword}

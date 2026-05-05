@@ -34,6 +34,9 @@
     "copy": "Скопировать",
     "copied": "Скопировано",
     "copyLink": "Скопировать ссылку",
+    "copyFailed": "Не удалось скопировать",
+    "showPassword": "Показать пароль",
+    "hidePassword": "Скрыть пароль",
     "exportZip": "Скачать ZIP",
     "exporting": "Экспорт…",
     "newCluster": "+ Новый кластер",
@@ -222,6 +225,9 @@
     "editHostDesc": "Изменить маршрут для {{domain}}.",
     "deleteModalTitle": "Удалить хост прокси",
     "deleteModalDesc": "Маршрутизация {{domain}} будет удалена. Активные соединения могут разорваться.",
+    "toastEnabled": "{{domain}} включён",
+    "toastDisabled": "{{domain}} выключен",
+    "toastDeleted": "{{domain}} удалён",
     "domainLabel": "Домен",
     "domainHint": "FQDN. Wildcard *.example.com тоже допустим.",
     "schemeLabel": "Схема",
@@ -407,7 +413,9 @@
     "restoring": "Восстановление...",
     "confirmTitle": "Подтверждение",
     "confirmBody": "Все текущие данные будут стерты и заменены на содержимое бэкапа. Действие необратимо.",
-    "invalidFile": "Файл не является корректным бэкапом HPM."
+    "invalidFile": "Файл не является корректным бэкапом HPM.",
+    "downloadOk": "Бэкап скачан",
+    "restoreOk": "Бэкап восстановлен"
   },
   "help": {
     "kicker": "// Справка",
