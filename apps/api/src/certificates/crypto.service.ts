@@ -49,3 +49,17 @@ export class CryptoService implements OnModuleInit {
     return this.decrypt(blob).toString('utf8');
   }
 }
+
+/**
+ * Конвертирует Buffer в Uint8Array<ArrayBuffer>. Prisma 7 ужесточил типизацию
+ * Bytes-полей: они принимают только Uint8Array поверх обычного ArrayBuffer, а
+ * `Buffer.from(...)` (после @types/node 22+) возвращает Buffer<ArrayBufferLike>,
+ * что включает SharedArrayBuffer. Создаём явный ArrayBuffer и наливаем в него
+ * байты — TS видит точный generic-параметр.
+ */
+export function toBytes(buf: Buffer): Uint8Array<ArrayBuffer> {
+  const ab = new ArrayBuffer(buf.length);
+  const out = new Uint8Array(ab);
+  out.set(buf);
+  return out;
+}

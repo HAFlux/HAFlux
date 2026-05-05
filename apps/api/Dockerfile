@@ -46,6 +46,9 @@ RUN apk add --no-cache openssl libstdc++ docker-cli openssh-client socat
 
 COPY --from=builder /out ./
 COPY --from=builder /repo/apps/api/prisma ./prisma
+# Prisma 7: prisma.config.ts держит DATABASE_URL для CLI (db push / migrate)
+# и обязан лежать рядом с `prisma generate` запуском.
+COPY --from=builder /repo/apps/api/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /repo/apps/api/dist ./dist
 # Vite-build SPA отдаём из /app/public — main.ts регистрирует @fastify/static
 COPY --from=builder /repo/apps/web/dist ./public

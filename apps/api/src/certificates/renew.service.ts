@@ -3,7 +3,7 @@ import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@ne
 import { AppException, ErrorCode } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
 import { AcmeService } from './acme.service';
-import { CryptoService } from './crypto.service';
+import { CryptoService, toBytes } from './crypto.service';
 
 const RENEW_THRESHOLD_DAYS = 10;
 const TICK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6h
@@ -105,7 +105,7 @@ export class CertificateRenewService implements OnModuleInit, OnModuleDestroy {
         fingerprintSha256: fingerprint,
         issuer: result.issuer,
         sans: result.sans,
-        encryptedPemBlob,
+        encryptedPemBlob: toBytes(encryptedPemBlob),
       },
     });
 
