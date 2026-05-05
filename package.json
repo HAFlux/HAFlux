@@ -1,6 +1,6 @@
 {
   "name": "haflux",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "private": true,
   "description": "Multi-HAProxy control plane: visual management for HAProxy clusters via Data Plane API.",
   "license": "AGPL-3.0-only",
@@ -10,10 +10,10 @@
     "url": "https://github.com/haflux/haflux.git"
   },
   "engines": {
-    "node": ">=20.18.0",
-    "pnpm": ">=9.15.0"
+    "node": ">=20.19.0",
+    "pnpm": ">=10.0.0"
   },
-  "packageManager": "pnpm@9.15.0",
+  "packageManager": "pnpm@10.33.3",
   "scripts": {
     "build": "pnpm -r --filter './apps/*' --filter './packages/*' run build",
     "dev": "pnpm -r --parallel --filter './apps/api' --filter './apps/web' run dev",
@@ -36,6 +36,7 @@
         "react": "19",
         "react-dom": "19"
       }
-    }
+    },
+    "onlyBuiltDependencies": ["@prisma/engines", "argon2", "esbuild", "prisma"]
   }
 }
