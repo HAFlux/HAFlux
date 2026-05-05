@@ -12,12 +12,20 @@ import { ConfigService } from '@nestjs/config';
  * Backend имя содержит 'be_proxy_<id>' для нашего рендера.
  */
 /**
- * Захватывает максимум из httplog (+ опционально User-Agent во второй паре кавычек):
+ * Захватывает максимум из httplog. Renderer добавляет
+ * `capture request header User-Agent len 200`, поэтому в строке между
+ * queue-счётчиками и request-line появляется блок `{<captured-headers>}`.
+ * Без поддержки этой формы регекс не матчил ни одну строку и UI получал
+ * пустые логи.
+ *
  *   <client_ip>:<port> [time] frontend backend/server Tq/Tw/Tc/Tr/Tt
- *   status bytes - - termState <conns> <queue> "METHOD URL HTTP/x" ["User-Agent"]
+ *   status bytes - - termState <conns> <queue> [{captured}] "METHOD URL HTTP/x" ["User-Agent"]
  */
 const LOG_REGEX =
-  /(?<clientIp>\d{1,3}(?:\.\d{1,3}){3}|[0-9a-fA-F:]+):(?<clientPort>\d+)\s+\[(?<time>[^\]]+)\]\s+(?<frontend>\S+)\s+(?<backend>[^/]+)\/(?<server>\S+)\s+(?<timers>\S+)\s+(?<status>\d+)\s+(?<bytes>\d+)\s+\S+\s+\S+\s+(?<termState>\S+)\s+\S+\s+\S+\s+"(?<method>\S+)\s+(?<url>[^"]*?)\s+\S+"(?:\s+"(?<userAgent>[^"]*)")?/;
+  /(?<clientIp>\d{1,3}(?:\.\d{1,3}){3}|[0-9a-fA-F:]+):(?<clientPort>\d+)\s+\[(?<time>[^\]]+)\]\s+(?<frontend>\S+)\s+(?<backend>[^/]+)\/(?<server>\S+)\s+(?<timers>\S+)\s+(?<status>\d+)\s+(?<bytes>\d+)\s+\S+\s+\S+\s+(?<termState>\S+)\s+\S+\s+\S+(?:\s+\{(?<capturedReq>[^}]*)\})?(?:\s+\{(?<capturedRes>[^}]*)\})?\s+"(?<method>\S+)\s+(?<url>[^"]*?)\s+\S+"(?:\s+"(?<userAgent>[^"]*)")?/;
+
+/** Экспортируется только для тестов — чтобы не дублировать regex. */
+export const __LOG_REGEX_FOR_TESTS = LOG_REGEX;
 
 export interface LogEntry {
   time: string;
@@ -150,6 +158,11 @@ export class HaproxyLogsService implements OnModuleInit, OnModuleDestroy {
     const m2 = /^[a-z][a-z0-9+.-]*:\/\/[^/]+(\/.*)?$/i.exec(url);
     if (m2) pathOnly = m2[1] ?? '/';
 
+    // User-Agent: рендерер кладёт его в первый capture-блок ({...}); если когда-нибудь
+    // включат второй quoted UA в log-format — он уйдёт в g.userAgent. Берём первый
+    // непустой источник.
+    const ua = (g.userAgent ?? g.capturedReq ?? '').trim();
+
     const entry: LogEntry = {
       time: g.time ?? '',
       clientIp: g.clientIp ?? '',
@@ -165,7 +178,7 @@ export class HaproxyLogsService implements OnModuleInit, OnModuleDestroy {
       durationMs,
       backendMs,
       termState: g.termState ?? '',
-      userAgent: g.userAgent ?? '',
+      userAgent: ua,
     };
 
     let state = this.perHost.get(hostId);

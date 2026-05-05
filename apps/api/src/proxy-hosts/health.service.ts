@@ -11,6 +11,23 @@ function probePathFromDb(healthCheckPath: string | null | undefined): string {
   return p.replace(/\/{2,}/g, '/') || '/';
 }
 
+/**
+ * api-контейнер живёт в своей network namespace, поэтому 127.0.0.1 / localhost
+ * там — это сам api, а не хост, на котором HAProxy слушает свои upstream'ы.
+ * На реальном пути (клиент → HAProxy → upstream) HAProxy подключается к
+ * host loopback, потому что он в `network_mode: host`. Чтобы health-probe
+ * совпал с реальным маршрутом, переписываем loopback на host.docker.internal,
+ * который Docker резолвит в gateway хоста (для этого compose добавляет
+ * `extra_hosts: host.docker.internal:host-gateway`).
+ */
+const HOST_LOOPBACK_REWRITE = process.env.HOST_LOOPBACK_REWRITE ?? 'host.docker.internal';
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '0.0.0.0']);
+
+function rewriteLoopback(host: string): string {
+  if (LOOPBACK_HOSTS.has(host.toLowerCase())) return HOST_LOOPBACK_REWRITE;
+  return host;
+}
+
 function buildProbeUrl(
   scheme: string,
   host: string,
@@ -18,7 +35,7 @@ function buildProbeUrl(
   healthCheckPath: string | null | undefined,
 ): string {
   const path = probePathFromDb(healthCheckPath);
-  return `${scheme}://${host}:${port}${path}`;
+  return `${scheme}://${rewriteLoopback(host)}:${port}${path}`;
 }
 
 /** Заголовок Host как у клиентов за HAProxy (vhost на upstream). Wildcard в UI не подставляем. */
