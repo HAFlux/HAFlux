@@ -406,21 +406,21 @@ function IssueSection({
               variant="secondary"
               onSelectionChange={(key) => setStaging(String(key) === 'staging')}
             >
-              <Select.Trigger className="cyber-input flex min-h-10 w-full items-center justify-between gap-2 text-left font-mono text-sm">
-                <Select.Value />
-                <Select.Indicator />
+              <Select.Trigger className="cyber-input flex min-h-10 w-full min-w-0 items-center justify-between gap-2 text-left font-mono text-sm">
+                <Select.Value className="min-w-0 truncate" />
+                <Select.Indicator className="shrink-0" />
               </Select.Trigger>
               <Select.Popover className="cyber-popover">
                 <ListBox>
                   <ListBox.Item
-                    className="font-mono text-sm"
+                    className="truncate font-mono text-sm"
                     id="production"
                     textValue={t('certificates.endpointProd')}
                   >
                     {t('certificates.endpointProd')}
                   </ListBox.Item>
                   <ListBox.Item
-                    className="font-mono text-sm"
+                    className="truncate font-mono text-sm"
                     id="staging"
                     textValue={t('certificates.endpointStaging')}
                   >
