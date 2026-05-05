@@ -1,5 +1,5 @@
 ## ─── Builder ─────────────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /repo
 
 # Тег релиза (например v0.1.0) пробрасывается release.yml через --build-arg
@@ -7,7 +7,7 @@ WORKDIR /repo
 ARG APP_VERSION=dev
 ENV VITE_APP_VERSION=${APP_VERSION}
 
-RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+RUN corepack enable && corepack prepare pnpm@10.33.3 --activate
 
 # Lockfile + manifests — отдельный слой: при смене только исходников кэш store не инвалидируется.
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* tsconfig.base.json biome.json ./
@@ -34,7 +34,7 @@ RUN pnpm --filter @haflux/contracts build \
  && pnpm --filter @haflux/api deploy --prod /out
 
 ## ─── Runtime ─────────────────────────────────────────────────────────────
-FROM node:20-alpine AS runtime
+FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
