@@ -8,10 +8,21 @@ import {
   HttpCode,
   Param,
   Post,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+
+/**
+ * Минимальный shape FastifyReply, который мы используем для бинарных
+ * downloads. Полный тип из 'fastify' тянуть в api нет смысла — не хочется
+ * добавлять зависимость ради двух методов.
+ */
+interface FastifyReplyLike {
+  header(name: string, value: string): FastifyReplyLike;
+  send(payload: Buffer): unknown;
+}
 import { z } from 'zod';
 import { ErrorCode } from '../common/errors';
 import { zodToAppException } from '../common/zod-to-error';
@@ -137,5 +148,40 @@ export class CertificatesController {
   @ApiOperation({ summary: 'Renew an ACME certificate now' })
   renewCert(@Param('id') id: string) {
     return this.renew.renew(id);
+  }
+
+  // ── Export ────────────────────────────────────────────────────────
+  // ВАЖНО: специфичный путь /export/all должен быть до :id/export, иначе
+  // 'all' будет проинтерпретировано как id и упадёт в 404 CERT_NOT_FOUND.
+
+  @Get('export/all')
+  @ApiOperation({ summary: 'Download all certificates as a ZIP archive' })
+  async exportAll(@Res({ passthrough: false }) reply: FastifyReplyLike) {
+    const { zip, count } = await this.svc.exportAllAsZip();
+    const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 16);
+    reply
+      .header('Content-Type', 'application/zip')
+      .header('Content-Disposition', `attachment; filename="haflux-certs-${stamp}.zip"`)
+      .header('X-Cert-Count', String(count))
+      .header('Content-Length', String(zip.length))
+      .send(zip);
+  }
+
+  @Get(':id/export')
+  @ApiOperation({ summary: 'Download a single certificate as a ZIP (fullchain + privkey)' })
+  async exportOne(@Param('id') id: string, @Res({ passthrough: false }) reply: FastifyReplyLike) {
+    const c = await this.svc.exportCertificate(id);
+    const { buildZip, safeName, shortHash } = await import('./zip');
+    const dir = `${safeName(c.commonName)}__${shortHash(id)}`;
+    const mtime = c.notBefore.getTime();
+    const zip = buildZip([
+      { name: `${dir}/fullchain.pem`, data: Buffer.from(c.fullchainPem, 'utf8'), mtime },
+      { name: `${dir}/privkey.pem`, data: Buffer.from(c.privkeyPem, 'utf8'), mtime },
+    ]);
+    reply
+      .header('Content-Type', 'application/zip')
+      .header('Content-Disposition', `attachment; filename="${safeName(c.commonName)}.zip"`)
+      .header('Content-Length', String(zip.length))
+      .send(zip);
   }
 }

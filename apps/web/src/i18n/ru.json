@@ -31,6 +31,11 @@
     "add": "Добавить",
     "remove": "Удалить",
     "close": "Закрыть",
+    "copy": "Скопировать",
+    "copied": "Скопировано",
+    "copyLink": "Скопировать ссылку",
+    "exportZip": "Скачать ZIP",
+    "exporting": "Экспорт…",
     "newCluster": "+ Новый кластер",
     "newProxyHost": "+ Добавить хост",
     "saving": "Сохранение…",
@@ -198,6 +203,9 @@
     "sanLine": "SAN [{{list}}]",
     "renewOnlyAcme": "Обновлять можно только ACME-сертификаты",
     "renewNow": "Обновить сейчас",
+    "exportOneTitle": "Скачать fullchain.pem + privkey.pem одним ZIP-архивом",
+    "exportAllTitle": "Скачать все сертификаты одним ZIP-архивом",
+    "exportAll": "Скачать все ({{count}}) ZIP",
     "selectionNote": "Выбор сохраняется в этом экране. Выбор bind во frontend (настройки → frontends) появится в следующей интеграции."
   },
   "proxyHosts": {

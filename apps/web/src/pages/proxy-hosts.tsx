@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { CopyButton } from '@/components/copy-button';
 import { Help } from '@/components/help';
 import { Modal } from '@/components/modal';
 import { PageHeader } from '@/components/page-header';
@@ -246,6 +247,9 @@ function ProxyHostRow({
   const qc = useQueryClient();
   const isL7 = host.forwardScheme === 'http' || host.forwardScheme === 'https';
   const target = `${host.forwardScheme}://${host.forwardHost}:${host.forwardPort}`;
+  const publicUrl = isL7
+    ? `${host.ssl ? 'https' : 'http'}://${host.domain}${host.ssl && host.listenPort && host.listenPort !== 443 ? `:${host.listenPort}` : !host.ssl && host.listenPort && host.listenPort !== 80 ? `:${host.listenPort}` : ''}`
+    : `${host.forwardScheme}://${host.domain}${host.listenPort ? `:${host.listenPort}` : ''}`;
   const [statsOpen, setStatsOpen] = useState(false);
   const probe = useMutation({
     mutationFn: () => api.proxyHosts.healthCheck(host.id),
@@ -261,18 +265,23 @@ function ProxyHostRow({
         <div className="min-w-0 flex flex-col gap-1.5">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <HealthDot status={host.healthStatus} />
-            <span className="cyber-mono text-sm font-medium">
-              {isL7 ? (
-                <>
-                  {host.ssl ? 'https://' : 'http://'}
-                  {host.domain}
-                </>
-              ) : (
-                <>
-                  <span className="cyber-tag">{host.forwardScheme}</span> {host.domain}
-                </>
-              )}
-            </span>
+            {isL7 ? (
+              <a
+                href={publicUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="cyber-mono text-sm font-medium underline decoration-dotted underline-offset-4 hover:opacity-80"
+                title={publicUrl}
+              >
+                {host.ssl ? 'https://' : 'http://'}
+                {host.domain}
+              </a>
+            ) : (
+              <span className="cyber-mono text-sm font-medium">
+                <span className="cyber-tag">{host.forwardScheme}</span> {host.domain}
+              </span>
+            )}
+            <CopyButton value={publicUrl} iconOnly className="cyber-btn-sm" />
             <span style={{ color: 'var(--color-muted)' }}>→</span>
             <span className="cyber-mono text-sm" style={{ color: 'var(--color-muted)' }}>
               {target}
