@@ -5,9 +5,12 @@ import * as acme from 'acme-client';
 type AcmeAuthz = { identifier: { value: string }; wildcard?: boolean; url?: string };
 type AcmeChallenge = { type: string; url?: string; token?: string };
 import { AppException, ErrorCode } from '../common/errors';
+import { PrismaService } from '../prisma/prisma.service';
 import { CloudflareDnsProvider } from './cloudflare.provider';
+import { CryptoService, toBytes } from './crypto.service';
 
 export interface IssueOptions {
+  orgId: string;
   domain: string; // apex (e.g. example.com)
   wildcard: boolean; // true → SAN: example.com + *.example.com
   email: string;
@@ -59,7 +62,65 @@ if (acmeWithAxios.axios?.defaults && acmeWithAxios.axios.defaults.timeout !== AC
 export class AcmeService {
   private readonly logger = new Logger(AcmeService.name);
 
-  constructor(private readonly cf: CloudflareDnsProvider) {}
+  constructor(
+    private readonly cf: CloudflareDnsProvider,
+    private readonly prisma: PrismaService,
+    private readonly crypto: CryptoService,
+  ) {}
+
+  /**
+   * Достаёт существующий ACME-аккаунт для (orgId, directoryUrl) или создаёт
+   * новый и сохраняет в `AcmeAccount`. Без переиспользования каждый issue()
+   * создаёт свежий аккаунт, и за день диагностики/повторов мы упираемся в
+   * лимит LE prod «10 регистраций с IP за 3ч» — `client.auto()` начинает
+   * висеть на createAccount, ожидая Retry-After.
+   */
+  private async resolveAccount(
+    orgId: string,
+    directoryUrl: string,
+    email: string,
+  ): Promise<{ accountKey: Buffer; accountUrl?: string; isNew: boolean }> {
+    const existing = await this.prisma.acmeAccount.findFirst({
+      where: { orgId, directoryUrl },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (existing) {
+      try {
+        const pem = this.crypto.decrypt(Buffer.from(existing.encryptedKey));
+        return { accountKey: pem, accountUrl: existing.kid ?? undefined, isNew: false };
+      } catch (err) {
+        // ENCRYPTION_KEY мог поменяться — выкидываем стухшую запись и идём
+        // создавать новую (потеряем только KID, не сами сертификаты).
+        this.logger.warn(
+          `AcmeAccount ${existing.id} decrypt failed, recreating: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+        await this.prisma.acmeAccount.delete({ where: { id: existing.id } });
+      }
+    }
+    const fresh = await acme.crypto.createPrivateKey();
+    return { accountKey: fresh, accountUrl: undefined, isNew: true };
+  }
+
+  private async persistAccount(
+    orgId: string,
+    directoryUrl: string,
+    email: string,
+    accountKey: Buffer,
+    kid: string,
+  ): Promise<void> {
+    await this.prisma.acmeAccount.create({
+      data: {
+        orgId,
+        provider: 'letsencrypt',
+        email,
+        directoryUrl,
+        kid,
+        encryptedKey: toBytes(this.crypto.encrypt(accountKey)),
+      },
+    });
+  }
 
   async issue(opts: IssueOptions): Promise<IssueResult> {
     const directoryUrl = opts.staging
@@ -85,8 +146,16 @@ export class AcmeService {
     let certPem: string;
     let keyPem: string;
     try {
-      const accountKey = await acme.crypto.createPrivateKey();
-      const client = new acme.Client({ directoryUrl, accountKey });
+      const { accountKey, accountUrl, isNew } = await this.resolveAccount(
+        opts.orgId,
+        directoryUrl,
+        opts.email,
+      );
+      this.logger.log(
+        `[${elapsed()}] account: ${isNew ? 'NEW (will register)' : `reuse kid=${accountUrl?.slice(-12) ?? '?'}`}`,
+      );
+      // Если есть kid — acme-client пропускает newAccount и сразу JWS-кид всё подписывает.
+      const client = new acme.Client({ directoryUrl, accountKey, accountUrl });
 
       const [keyBuf, csrBuf] = await acme.crypto.createCsr({
         commonName: opts.domain,
@@ -118,6 +187,23 @@ export class AcmeService {
       );
       certPem = certBuf.toString();
       this.logger.log(`[${elapsed()}] cert issued for ${tag}`);
+
+      // Если это был свежий аккаунт — auto() уже зарегистрировал его в LE,
+      // KID лежит в client.getAccountUrl(). Сохраняем чтобы следующий issue()
+      // переиспользовал его и не упирался в «10 регистраций с IP за 3ч».
+      if (isNew) {
+        try {
+          const kid = client.getAccountUrl();
+          await this.persistAccount(opts.orgId, directoryUrl, opts.email, accountKey, kid);
+          this.logger.log(`[${elapsed()}] persisted ACME account kid=${kid.slice(-12)}`);
+        } catch (e) {
+          // Сертификат уже выдан — некритично, просто следующий issue
+          // зарегистрирует свежий аккаунт.
+          this.logger.warn(
+            `[${elapsed()}] failed to persist ACME account: ${e instanceof Error ? e.message : String(e)}`,
+          );
+        }
+      }
     } catch (err) {
       if (err instanceof AppException) throw err;
       const message = err instanceof Error ? err.message : String(err);

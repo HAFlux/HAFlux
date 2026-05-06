@@ -86,6 +86,7 @@ export class CertificateRenewService implements OnModuleInit, OnModuleDestroy {
 
     this.logger.log(`renew start: ${cert.commonName} (wildcard=${wildcard})`);
     const result = await this.acme.issue({
+      orgId: cert.orgId,
       domain: apex,
       wildcard,
       email: `admin@${apex}`, // best-effort, можно сделать настройкой org

@@ -125,6 +125,7 @@ export class CertificatesService {
     let result: Awaited<ReturnType<typeof this.acme.issue>>;
     try {
       result = await this.acme.issue({
+        orgId,
         domain: input.domain,
         wildcard: input.wildcard,
         email: input.email,
