@@ -1,6 +1,6 @@
 {
   "name": "@haflux/api",
-  "version": "0.4.5",
+  "version": "0.4.7",
   "private": true,
   "description": "HAFlux backend (NestJS).",
   "scripts": {
