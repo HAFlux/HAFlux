@@ -77,8 +77,11 @@ export class AcmeService {
           const txtName = `_acme-challenge.${apex}`;
           const zone = await this.cf.resolveZoneId(opts.cfApiToken, apex);
           await this.cf.addTxtRecord(opts.cfApiToken, zone.id, txtName, keyAuthorization);
-          // Cloudflare обычно пропагирует <30s, ждём 20s для надёжности.
-          await new Promise((r) => setTimeout(r, 20_000));
+          // Cloudflare обычно пропагирует <30s, но при wildcard в одном FQDN
+          // лежат две TXT-записи (apex + *.apex) и LE ходит со своих
+          // резолверов — наблюдали "Authorization not found" при 20s. 180s
+          // даёт запас на медленные authoritative-кеши.
+          await new Promise((r) => setTimeout(r, 180_000));
         },
         challengeRemoveFn: async (authz: AcmeAuthz, challenge: AcmeChallenge) => {
           if (challenge.type !== 'dns-01') return;
