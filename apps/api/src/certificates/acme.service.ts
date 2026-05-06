@@ -2,8 +2,8 @@ import { Resolver } from 'node:dns/promises';
 import { Injectable, Logger } from '@nestjs/common';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import * as acme from 'acme-client';
-type AcmeAuthz = { identifier: { value: string } };
-type AcmeChallenge = { type: string };
+type AcmeAuthz = { identifier: { value: string }; wildcard?: boolean; url?: string };
+type AcmeChallenge = { type: string; url?: string; token?: string };
 import { AppException, ErrorCode } from '../common/errors';
 import { CloudflareDnsProvider } from './cloudflare.provider';
 
@@ -73,6 +73,15 @@ export class AcmeService {
     const t0 = Date.now();
     const elapsed = () => `${((Date.now() - t0) / 1000).toFixed(1)}s`;
 
+    // Map authz.identifier.value (e.g. 'fstgm1.com' / '*.fstgm1.com') →
+    // ID созданной нами TXT-записи в Cloudflare. Нужен потому, что для wildcard
+    // обе authz используют один FQDN `_acme-challenge.<apex>` с разными
+    // keyAuthorization, и acme-client обрабатывает их параллельно. Каждая
+    // challengeRemoveFn должна снять ИМЕННО свою запись, а не «все TXT по имени» —
+    // иначе removeFn первой завершившейся authz убивает TXT второй, и LE
+    // получает NXDOMAIN при валидации.
+    const ourTxtIds = new Map<string, { zoneId: string; recordId: string }>();
+
     let certPem: string;
     let keyPem: string;
     try {
@@ -93,9 +102,16 @@ export class AcmeService {
           termsOfServiceAgreed: true,
           challengePriority: ['dns-01'],
           challengeCreateFn: (authz, challenge, keyAuthorization) =>
-            this.handleChallengeCreate(opts.cfApiToken, authz, challenge, keyAuthorization, elapsed),
+            this.handleChallengeCreate(
+              opts.cfApiToken,
+              authz,
+              challenge,
+              keyAuthorization,
+              ourTxtIds,
+              elapsed,
+            ),
           challengeRemoveFn: (authz, challenge) =>
-            this.handleChallengeRemove(opts.cfApiToken, authz, challenge, elapsed),
+            this.handleChallengeRemove(opts.cfApiToken, authz, challenge, ourTxtIds, elapsed),
         }),
         ACME_FLOW_BUDGET_MS,
         `ACME flow exceeded ${ACME_FLOW_BUDGET_MS / 1000}s budget`,
@@ -111,6 +127,24 @@ export class AcmeService {
         `ACME (${opts.staging ? 'staging' : 'production'}) failed after ${elapsed()}: ${message}`,
         502,
       );
+    } finally {
+      // Если acme-client упал до challengeRemoveFn (или мы аборнулись по бюджету)
+      // — сами вычистим оставшиеся наши TXT, чтобы не засорять зону.
+      if (ourTxtIds.size > 0) {
+        for (const [fqdn, ours] of ourTxtIds) {
+          try {
+            await this.cf.removeTxtRecord(opts.cfApiToken, ours.zoneId, ours.recordId);
+            this.logger.log(`[${elapsed()}] post-flight cleanup: removed TXT for ${fqdn}`);
+          } catch (e) {
+            this.logger.warn(
+              `[${elapsed()}] post-flight cleanup ${ours.recordId} failed: ${
+                e instanceof Error ? e.message : String(e)
+              }`,
+            );
+          }
+        }
+        ourTxtIds.clear();
+      }
     }
 
     const info = acme.crypto.readCertificateInfo(certPem);
@@ -130,6 +164,7 @@ export class AcmeService {
     authz: AcmeAuthz,
     challenge: AcmeChallenge,
     keyAuthorization: string,
+    ourTxtIds: Map<string, { zoneId: string; recordId: string }>,
     elapsed: () => string,
   ): Promise<void> {
     if (challenge.type !== 'dns-01') {
@@ -139,8 +174,13 @@ export class AcmeService {
     const apex = fqdn.replace(/^\*\./, '');
     const txtName = `_acme-challenge.${apex}`;
     const zone = await this.cf.resolveZoneId(cfApiToken, apex);
-    await this.cf.addTxtRecord(cfApiToken, zone.id, txtName, keyAuthorization);
-    this.logger.log(`[${elapsed()}] TXT для ${fqdn} записан, жду пропагации в 1.1.1.1`);
+    const recordId = await this.cf.addTxtRecord(cfApiToken, zone.id, txtName, keyAuthorization);
+    // Per RFC 8555, для wildcard authz `identifier.value` это apex без `*.`
+    // (отличаются только флагом authz.wildcard). Поэтому ключом Map берём
+    // (apex, wildcard) — иначе wildcard-authz перетирает apex-authz.
+    const label = `${fqdn}/${authz.wildcard ? 'wildcard' : 'apex'}`;
+    ourTxtIds.set(label, { zoneId: zone.id, recordId });
+    this.logger.log(`[${elapsed()}] TXT для ${label} записан (id=${recordId}), жду пропагации`);
 
     // Опрос recursive resolver (1.1.1.1) пока наша конкретная keyAuthorization не появится.
     // Для wildcard в одном FQDN живут ДВЕ TXT (apex + *.apex с разными keyAuth) — поэтому
@@ -161,23 +201,24 @@ export class AcmeService {
     cfApiToken: string,
     authz: AcmeAuthz,
     challenge: AcmeChallenge,
+    ourTxtIds: Map<string, { zoneId: string; recordId: string }>,
     elapsed: () => string,
   ): Promise<void> {
     if (challenge.type !== 'dns-01') return;
     const fqdn = authz.identifier.value;
-    const apex = fqdn.replace(/^\*\./, '');
-    const txtName = `_acme-challenge.${apex}`;
+    const label = `${fqdn}/${authz.wildcard ? 'wildcard' : 'apex'}`;
+    const ours = ourTxtIds.get(label);
+    if (!ours) {
+      this.logger.warn(`[${elapsed()}] cleanup: no TXT recorded for ${label}, skipping`);
+      return;
+    }
     try {
-      const zone = await this.cf.resolveZoneId(cfApiToken, apex);
-      const recs = await this.cf.findTxtRecords(cfApiToken, zone.id, txtName);
-      // На wildcard apex и *.apex дают TXT с одинаковым именем — снимаем все.
-      for (const rec of recs) {
-        await this.cf.removeTxtRecord(cfApiToken, zone.id, rec.id);
-      }
-      this.logger.log(`[${elapsed()}] cleanup: removed ${recs.length} TXT for ${txtName}`);
+      await this.cf.removeTxtRecord(cfApiToken, ours.zoneId, ours.recordId);
+      ourTxtIds.delete(label);
+      this.logger.log(`[${elapsed()}] cleanup: removed TXT ${ours.recordId} for ${label}`);
     } catch (err) {
       this.logger.warn(
-        `[${elapsed()}] cleanup TXT failed for ${txtName}: ${
+        `[${elapsed()}] cleanup TXT ${ours.recordId} failed: ${
           err instanceof Error ? err.message : String(err)
         }`,
       );
