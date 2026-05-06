@@ -27,6 +27,10 @@ export interface VerifyResult {
   warnings: string[];
 }
 
+// Без таймаута undici fetch висит вечно при сетевых проблемах — попадали на это
+// в hang'е ACME flow: Cloudflare API не отвечал, весь issue стоял колом.
+const CF_HTTP_TIMEOUT_MS = 15_000;
+
 @Injectable()
 export class CloudflareDnsProvider {
   private readonly logger = new Logger(CloudflareDnsProvider.name);
@@ -90,21 +94,41 @@ export class CloudflareDnsProvider {
   }
 
   async findTxtRecord(token: string, zoneId: string, name: string): Promise<CfDnsRecord | null> {
-    const arr = await this.cf<CfDnsRecord[]>(
-      `/zones/${zoneId}/dns_records?type=TXT&name=${encodeURIComponent(name)}`,
+    const arr = await this.findTxtRecords(token, zoneId, name);
+    return arr[0] ?? null;
+  }
+
+  /**
+   * Возвращает ВСЕ TXT-записи с данным именем. Для wildcard ACME под одним
+   * `_acme-challenge.<apex>` лежат две TXT (apex + *.apex), и cleanup должен
+   * снять обе — иначе одна остаётся «висеть» в зоне.
+   */
+  async findTxtRecords(token: string, zoneId: string, name: string): Promise<CfDnsRecord[]> {
+    return this.cf<CfDnsRecord[]>(
+      `/zones/${zoneId}/dns_records?type=TXT&name=${encodeURIComponent(name)}&per_page=50`,
       token,
     );
-    return arr[0] ?? null;
   }
 
   private async cf<T>(path: string, token: string, init: RequestInit = {}): Promise<T> {
     const res = await fetch(`${this.apiBase}${path}`, {
       ...init,
+      signal: AbortSignal.timeout(CF_HTTP_TIMEOUT_MS),
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
         ...(init.headers ?? {}),
       },
+    }).catch((err) => {
+      // AbortError → понятное сообщение про таймаут.
+      if (err instanceof Error && err.name === 'TimeoutError') {
+        throw new AppException(
+          ErrorCode.CLOUDFLARE_API_ERROR,
+          `Cloudflare API ${path} timed out after ${CF_HTTP_TIMEOUT_MS / 1000}s`,
+          504,
+        );
+      }
+      throw err;
     });
     const json = (await res.json().catch(() => ({}))) as {
       success?: boolean;
