@@ -145,7 +145,7 @@ export default function ErrorPagesPage() {
                   <Select.Value />
                   <Select.Indicator />
                 </Select.Trigger>
-                <Select.Popover>
+                <Select.Popover className="cyber-popover">
                   <ListBox>
                     {HTTP_ERROR_CODES.map((code) => (
                       <ListBox.Item

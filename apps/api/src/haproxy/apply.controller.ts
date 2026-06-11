@@ -10,7 +10,10 @@ import { ApplyService } from './apply.service';
 export class ApplyController {
   constructor(private readonly svc: ApplyService) {}
 
-  @Post('apply')
+  // «Продуктовый» Apply (proxy hosts → ноды кластера) живёт в
+  // ProxyHostsController: POST /clusters/:clusterId/apply. Здесь —
+  // advanced-конвейер CfgRenderer (полные секции haproxy.cfg), пока без UI.
+  @Post('apply-config')
   apply(
     @Param('clusterId') clusterId: string,
     @Body() body: { message?: string; dryRun?: boolean },
@@ -21,7 +24,7 @@ export class ApplyController {
     });
   }
 
-  @Post('validate')
+  @Post('validate-config')
   validate(@Param('clusterId') clusterId: string) {
     return this.svc.applyCluster(clusterId, {
       message: 'Validate only',

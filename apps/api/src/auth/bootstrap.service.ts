@@ -29,6 +29,37 @@ export class BootstrapService implements OnModuleInit {
     } catch (err) {
       this.logger.error('Bootstrap failed', err as Error);
     }
+    try {
+      await this.ensureLocalNode();
+    } catch (err) {
+      this.logger.error('ensureLocalNode failed', err as Error);
+    }
+  }
+
+  /**
+   * Миграция к node-aware деплою: у старых инсталляций нет ни одной Node,
+   * а конфиг исторически писался в локальный /haproxy-data. Привязываем
+   * LOCAL-ноду к самому старому кластеру, чтобы поведение не изменилось.
+   */
+  private async ensureLocalNode(): Promise<void> {
+    const existingLocal = await this.prisma.node.findFirst({ where: { transport: 'LOCAL' } });
+    if (existingLocal) return;
+    const oldest = await this.prisma.cluster.findFirst({ orderBy: { createdAt: 'asc' } });
+    if (!oldest) return; // кластеров ещё нет — нода создастся вместе с первым кластером
+    await this.prisma.node.create({
+      data: {
+        clusterId: oldest.id,
+        name: 'local',
+        transport: 'LOCAL',
+        haproxyDataDir: this.cfg.get<string>('HAPROXY_DATA_DIR') ?? '/haproxy-data',
+        reloadMode: 'CONTAINER',
+        reloadTarget: this.cfg.get<string>('HAPROXY_CONTAINER_NAME') ?? 'haproxy-balancer',
+        role: 'PRIMARY',
+        status: 'ONLINE',
+        lastSeenAt: new Date(),
+      },
+    });
+    this.logger.log(`Created LOCAL node for cluster "${oldest.name}" (node-aware deploy migration)`);
   }
 
   private async bootstrap(): Promise<void> {

@@ -343,12 +343,8 @@ function ProxyHostRow({
             {isL7 && host.httpToHttps && (
               <span className="cyber-tag">{t('proxyHosts.tag443')}</span>
             )}
-            {isL7 && host.hsts && <span className="cyber-tag">{t('proxyHosts.tagHsts')}</span>}
             {isL7 && host.http2 && host.ssl && (
               <span className="cyber-tag">{t('proxyHosts.tagH2')}</span>
-            )}
-            {isL7 && host.http3 && host.ssl && (
-              <span className="cyber-tag">{t('proxyHosts.tagH3')}</span>
             )}
             {isL7 && host.wsSupport && <span className="cyber-tag">{t('proxyHosts.tagWs')}</span>}
             {isL7 && host.blockExploits && (
@@ -730,11 +726,9 @@ interface FormState {
   certificateId: string | null;
   accessGroupIds: string[];
   httpToHttps: boolean;
-  hsts: boolean;
   blockExploits: boolean;
   wsSupport: boolean;
   http2: boolean;
-  http3: boolean;
   enabled: boolean;
   customHeaderRows: CustomHeaderRow[];
   notes: string;
@@ -753,11 +747,9 @@ function defaultFormState(): FormState {
     certificateId: null,
     accessGroupIds: [],
     httpToHttps: true,
-    hsts: false,
     blockExploits: true,
     wsSupport: true,
     http2: true,
-    http3: false,
     enabled: true,
     customHeaderRows: [newEmptyCustomHeaderRow()],
     notes: '',
@@ -776,11 +768,9 @@ function fromHost(host: ProxyHost): FormState {
     certificateId: host.certificateId,
     accessGroupIds: host.accessGroups.map((g) => g.id),
     httpToHttps: host.httpToHttps,
-    hsts: host.hsts,
     blockExploits: host.blockExploits,
     wsSupport: host.wsSupport,
     http2: host.http2,
-    http3: host.http3,
     enabled: host.enabled,
     customHeaderRows: headerRowsFromHost(host),
     notes: host.notes ?? '',
@@ -811,6 +801,17 @@ function ProxyHostFormModal({
   const [state, setState] = useState<FormState>(() => (host ? fromHost(host) : defaultFormState()));
   const [touched, setTouched] = useState({ domain: false, forwardHost: false });
 
+  // Проверка доступности upstream'а прямо из формы (без сохранения).
+  const probeM = useMutation({
+    mutationFn: () =>
+      api.proxyHosts.probe({
+        forwardScheme: state.forwardScheme,
+        forwardHost: state.forwardHost.trim(),
+        forwardPort: state.forwardPort,
+      }),
+  });
+  const probeReset = probeM.reset;
+
   // При открытии модалки — синхронизируем стейт с host'ом (для edit) или
   // ресетим (для create). Зависим от host?.id, не от ссылки host — иначе
   // лишние срабатывания сбрасывают accessGroupIds и чекбоксы «не держатся».
@@ -819,7 +820,9 @@ function ProxyHostFormModal({
     if (!open) return;
     setState(host ? fromHost(host) : defaultFormState());
     setTouched({ domain: false, forwardHost: false });
-  }, [open, host?.id, mode]);
+    probeReset();
+    // host в замыкании обновляется при смене id; при той же ссылке host не сбрасываем форму
+  }, [open, host?.id, mode, probeReset]);
 
   // Сертификаты, покрывающие выбранный домен
   const matchingCerts = useMemo(() => {
@@ -863,11 +866,9 @@ function ProxyHostFormModal({
         ssl: isL7 && state.ssl,
         certificateId: isL7 && state.ssl ? state.certificateId : null,
         httpToHttps: isL7 && state.ssl && state.httpToHttps,
-        hsts: isL7 && state.ssl && state.hsts,
         blockExploits: isL7 ? state.blockExploits : true,
         wsSupport: isL7 ? state.wsSupport : true,
         http2: isL7 && state.ssl && state.http2,
-        http3: isL7 && state.ssl && state.http3,
         accessGroupIds: isL7 ? state.accessGroupIds : [],
         notes: state.notes.trim() || null,
         healthCheckPath: isL7
@@ -892,11 +893,9 @@ function ProxyHostFormModal({
         ssl: isL7 && state.ssl,
         certificateId: isL7 && state.ssl ? state.certificateId : null,
         httpToHttps: isL7 && state.ssl && state.httpToHttps,
-        hsts: isL7 && state.ssl && state.hsts,
         blockExploits: isL7 ? state.blockExploits : true,
         wsSupport: isL7 ? state.wsSupport : true,
         http2: isL7 && state.ssl && state.http2,
-        http3: isL7 && state.ssl && state.http3,
         enabled: state.enabled,
         accessGroupIds: isL7 ? state.accessGroupIds : [],
         notes: state.notes.trim() || null,
@@ -1066,6 +1065,34 @@ function ProxyHostFormModal({
               onChange={(e) => setState((s) => ({ ...s, forwardPort: Number(e.target.value) }))}
             />
           </label>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            className="cyber-btn cyber-btn-ghost"
+            disabled={
+              !!forwardHostErrorKey ||
+              state.forwardPort < 1 ||
+              state.forwardPort > 65535 ||
+              probeM.isPending
+            }
+            onClick={() => probeM.mutate()}
+          >
+            {probeM.isPending ? t('proxyHosts.probeChecking') : t('proxyHosts.probeButton')}
+          </button>
+          {probeM.data && (
+            <span className="cyber-mono text-xs">
+              {probeM.data.status === 'HEALTHY' || probeM.data.status === 'DEGRADED'
+                ? `✓ ${t('proxyHosts.probeReachable')}${
+                    probeM.data.code != null ? ` · HTTP ${probeM.data.code}` : ''
+                  }${probeM.data.latencyMs != null ? ` · ${probeM.data.latencyMs} ms` : ''}`
+                : `✗ ${probeM.data.error ?? t('proxyHosts.probeUnreachable')}`}
+            </span>
+          )}
+          {probeM.isError && (
+            <span className="cyber-mono text-xs">✗ {t('proxyHosts.probeUnreachable')}</span>
+          )}
         </div>
 
         {!isL7 && (
@@ -1239,27 +1266,10 @@ function ProxyHostFormModal({
                   hint={t('proxyHosts.forceHttpsHint')}
                 />
                 <CheckboxRow
-                  checked={state.hsts}
-                  onChange={(v) => setState((s) => ({ ...s, hsts: v }))}
-                  title={t('proxyHosts.hsts')}
-                  hint={t('proxyHosts.hstsHint')}
-                />
-                <CheckboxRow
                   checked={state.http2}
                   onChange={(v) => setState((s) => ({ ...s, http2: v }))}
                   title={t('proxyHosts.http2')}
                   hint={t('proxyHosts.http2Hint')}
-                />
-                <CheckboxRow
-                  checked={state.http3}
-                  onChange={(v) => setState((s) => ({ ...s, http3: v }))}
-                  title={
-                    <span className="flex items-center gap-2">
-                      {t('proxyHosts.http3')}
-                      <Help text={t('proxyHosts.helpHttp3')} />
-                    </span>
-                  }
-                  hint={t('proxyHosts.http3Hint')}
                 />
               </>
             )}

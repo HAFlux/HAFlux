@@ -18,7 +18,7 @@
 #
 # Переменные окружения для override (необязательно):
 #   HAFLUX_INSTALL_DIR   default /opt/haflux
-#   HAFLUX_WEB_PORT      default 8080
+#   HAFLUX_WEB_PORT      default 8080            # порт панели (https, self-signed)
 #   HAFLUX_API_PORT      default 3000
 #   HAFLUX_API_TAG       default latest          # тег ghcr.io/haflux/api
 #   HAFLUX_API_IMAGE     полный image override (для приватного registry)
@@ -177,7 +177,7 @@ write_self_signed_cert() {
   [[ -f "$cert" ]] && return
   local pub_host
   pub_host="$(detect_public_host)"
-  log "Генерирую self-signed cert для :443 (CN=${pub_host})..."
+  log "Генерирую self-signed cert для панели :${WEB_PORT} (CN=${pub_host})..."
   local tmp_dir
   tmp_dir="$(mktemp -d)"
   ( umask 077
@@ -201,19 +201,14 @@ write_self_signed_cert() {
 write_bootstrap_cfg() {
   local cfg="$INSTALL_DIR/haproxy-data/haproxy.cfg"
   [[ -f "$cfg" ]] && return
-  # Доп. bind на WEB_PORT, если он отличается от 80 и 443 (haproxy не
-  # допускает дублирующих bind на одном порту). Так панель доступна и по
-  # чистому http://host/, и по https://host/, и опционально по
-  # http://host:WEB_PORT/.
-  local extra_bind=""
-  if [[ "$WEB_PORT" != "80" && "$WEB_PORT" != "443" ]]; then
-    extra_bind=$'\n  bind *:'"${WEB_PORT}"
-  fi
+  # Панель слушает ТОЛЬКО кастомный WEB_PORT (https, self-signed).
+  # :80 и :443 не биндим: они остаются свободными под proxy host'ы, и
+  # приземлённый на сервер домен не светит панель.
   cat > "$cfg" <<HAPROXY
 # Bootstrap haproxy.cfg — будет перезаписан HAFlux панелью при первом
-# Apply. До этого момента HAProxy слушает :80, :443 (с self-signed
-# сертом) и опционально :${WEB_PORT}, и проксирует и REST (/api/*), и
-# SPA на api контейнер (он сам отдаёт статику).
+# Apply. До этого момента HAProxy слушает только :${WEB_PORT} (self-signed
+# TLS) и проксирует и REST (/api/*), и SPA на api контейнер (он сам
+# отдаёт статику). :80/:443 свободны под будущие proxy host'ы.
 global
   maxconn 4000
   log stdout local0 info
@@ -229,8 +224,7 @@ defaults
   timeout server  60s
 
 frontend fe_panel
-  bind *:80
-  bind *:443 ssl crt /etc/haproxy/certs/_default.pem alpn h2,http/1.1${extra_bind}
+  bind *:${WEB_PORT} ssl crt /etc/haproxy/certs/_default.pem alpn h2,http/1.1
   default_backend be_panel
 
 backend be_panel
@@ -272,7 +266,7 @@ write_env() {
 PUBLIC_HOST=${public_host}
 WEB_PORT=${WEB_PORT}
 API_PORT=${API_PORT}
-ALLOWED_ORIGINS=http://${public_host}:${WEB_PORT}
+ALLOWED_ORIGINS=https://${public_host}:${WEB_PORT}
 
 POSTGRES_DB=haflux
 POSTGRES_USER=haflux
@@ -329,6 +323,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: ${API_PORT}
+      WEB_PORT: \${WEB_PORT}
       DATABASE_URL: postgres://\${POSTGRES_USER}:\${DB_PASSWORD}@db:5432/\${POSTGRES_DB}
       REDIS_URL: redis://redis:6379
       JWT_SECRET: \${JWT_SECRET}
@@ -422,7 +417,7 @@ MSG
 wait_healthy() {
   local i
   for ((i = 0; i < 60; i++)); do
-    if curl -fsS -m 3 "http://127.0.0.1/health" >/dev/null 2>&1; then
+    if curl -fsSk -m 3 "https://127.0.0.1:${WEB_PORT}/health" >/dev/null 2>&1; then
       return 0
     fi
     sleep 2
@@ -476,14 +471,14 @@ cmd_info() {
     rootpw="(файл ${INSTALL_DIR}/.secrets/root_password недоступен — запусти из-под root)"
   fi
   email="$(grep -E "^BOOTSTRAP_ROOT_EMAIL=" "${INSTALL_DIR}/.env" 2>/dev/null | cut -d= -f2- || echo "admin@haflux.local")"
+  port="$(grep -E "^WEB_PORT=" "${INSTALL_DIR}/.env" 2>/dev/null | cut -d= -f2- || echo "8080")"
 
   echo
   echo "$(bold)──────────────────────────────────────────────────────────$(norm)"
   echo "$(bold)HAFlux access$(norm)"
   echo "$(bold)──────────────────────────────────────────────────────────$(norm)"
   echo
-  echo "  URL:      $(bold)http://${pub_host}$(norm)"
-  echo "            $(bold)https://${pub_host}$(norm)  (self-signed)"
+  echo "  URL:      $(bold)https://${pub_host}:${port}$(norm)  (self-signed)"
   echo "  Email:    $(bold)${email}$(norm)"
   echo "  Password: $(bold)${rootpw}$(norm)"
   echo
@@ -518,16 +513,15 @@ print_banner() {
     bold="$(tput bold 2>/dev/null || true)"
     norm="$(tput sgr0 2>/dev/null || true)"
   fi
-  # Bootstrap haproxy.cfg слушает и :80, и :443 (self-signed), поэтому
-  # clean URL без порта работает на обоих схемах.
+  # Панель слушает только кастомный WEB_PORT — :80/:443 свободны под
+  # proxy host'ы, и приземлённый домен не показывает панель.
   cat <<BANNER
 
 ${bold}══════════════════════════════════════════════════════════${norm}
 ${bold}                  HAFlux control-plane is up${norm}
 ${bold}══════════════════════════════════════════════════════════${norm}
 
-  ${bold}URL${norm}:      ${bold}http://${pub_host}${norm}
-            ${bold}https://${pub_host}${norm}  (self-signed, до выпуска LE)
+  ${bold}URL${norm}:      ${bold}https://${pub_host}:${WEB_PORT}${norm}  (self-signed)
   ${bold}Email${norm}:    ${bold}${ROOT_EMAIL}${norm}
   ${bold}Password${norm}: ${bold}${rootpw}${norm}
 

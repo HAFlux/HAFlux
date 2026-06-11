@@ -22,19 +22,36 @@ const UserCreateSchema = z.object({
   password: z.string().min(1).max(512),
 });
 
+const CountryCodeSchema = z
+  .string()
+  .length(2)
+  .regex(/^[a-zA-Z]{2}$/, { message: 'country code must be ISO 3166-1 alpha-2' })
+  .transform((s) => s.toLowerCase());
+
 const CreateAccessGroupSchema = z
   .object({
     name: NameSchema,
     ipAllowlist: z.array(z.string().min(1).max(128)).max(500),
+    ipDenylist: z.array(z.string().min(1).max(128)).max(500).default([]),
+    geoDenylist: z.array(CountryCodeSchema).max(250).default([]),
     users: z.array(UserCreateSchema).max(50),
   })
-  .refine((d) => d.ipAllowlist.length > 0 || d.users.length > 0, {
-    message: 'At least one IP/CIDR or one Basic Auth user is required',
-  });
+  .refine(
+    (d) =>
+      d.ipAllowlist.length > 0 ||
+      d.ipDenylist.length > 0 ||
+      d.geoDenylist.length > 0 ||
+      d.users.length > 0,
+    {
+      message: 'At least one IP/CIDR, country, or Basic Auth user is required',
+    },
+  );
 
 const UpdateAccessGroupSchema = z.object({
   name: NameSchema.optional(),
   ipAllowlist: z.array(z.string().min(1).max(128)).max(500).optional(),
+  ipDenylist: z.array(z.string().min(1).max(128)).max(500).optional(),
+  geoDenylist: z.array(CountryCodeSchema).max(250).optional(),
   users: z
     .array(
       z.object({
@@ -96,6 +113,8 @@ export type AccessGroupListItem = {
   id: string;
   name: string;
   ipCount: number;
+  denyCount: number;
+  geoCount: number;
   userCount: number;
   proxyHostCount: number;
   createdAt: Date;
@@ -104,6 +123,8 @@ export type AccessGroupListItem = {
 
 export type AccessGroupDetail = AccessGroupListItem & {
   ipAllowlist: string[];
+  ipDenylist: string[];
+  geoDenylist: string[];
   users: { username: string; hasPassword: boolean }[];
 };
 
@@ -128,11 +149,15 @@ export class AccessGroupsService {
     });
     return rows.map((r) => {
       const ips = (r.ipAllowlist as string[]) ?? [];
+      const denies = (r.ipDenylist as string[]) ?? [];
+      const geo = (r.geoDenylist as string[]) ?? [];
       const users = (r.authUsers as { username: string }[]) ?? [];
       return {
         id: r.id,
         name: r.name,
         ipCount: ips.length,
+        denyCount: denies.length,
+        geoCount: geo.length,
         userCount: users.length,
         proxyHostCount: r._count.proxyHostMemberships,
         createdAt: r.createdAt,
@@ -149,16 +174,22 @@ export class AccessGroupsService {
     });
     if (!r) throw new AppException(ErrorCode.NOT_FOUND, 'Access group not found', 404);
     const ips = (r.ipAllowlist as string[]) ?? [];
+    const denies = (r.ipDenylist as string[]) ?? [];
+    const geo = (r.geoDenylist as string[]) ?? [];
     const users = (r.authUsers as { username: string; passwordEnc: string }[]) ?? [];
     return {
       id: r.id,
       name: r.name,
       ipCount: ips.length,
+      denyCount: denies.length,
+      geoCount: geo.length,
       userCount: users.length,
       proxyHostCount: r._count.proxyHostMemberships,
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
       ipAllowlist: ips,
+      ipDenylist: denies,
+      geoDenylist: geo,
       users: users.map((u) => ({
         username: u.username,
         hasPassword: !!u.passwordEnc,
@@ -175,6 +206,7 @@ export class AccessGroupsService {
     }
 
     const ipLines = normalizeIpLines(parsed.data.ipAllowlist);
+    const denyLines = normalizeIpLines(parsed.data.ipDenylist);
     const authUsers = this.encryptUsers(parsed.data.users);
 
     const exists = await this.prisma.accessGroup.findUnique({
@@ -192,6 +224,8 @@ export class AccessGroupsService {
         clusterId,
         name: parsed.data.name.trim(),
         ipAllowlist: ipLines,
+        ipDenylist: denyLines,
+        geoDenylist: parsed.data.geoDenylist,
         authUsers,
       },
     });
@@ -231,6 +265,16 @@ export class AccessGroupsService {
       nextIp = normalizeIpLines(parsed.data.ipAllowlist);
     }
 
+    let nextDeny = (existing.ipDenylist as string[]) ?? [];
+    if (parsed.data.ipDenylist !== undefined) {
+      nextDeny = normalizeIpLines(parsed.data.ipDenylist);
+    }
+
+    let nextGeo = (existing.geoDenylist as string[]) ?? [];
+    if (parsed.data.geoDenylist !== undefined) {
+      nextGeo = parsed.data.geoDenylist;
+    }
+
     let nextAuth: object[] = (existing.authUsers as object[]) ?? [];
     if (parsed.data.users !== undefined) {
       const prev = (existing.authUsers as { username: string; passwordEnc: string }[]) ?? [];
@@ -256,10 +300,15 @@ export class AccessGroupsService {
       }
     }
 
-    if (nextIp.length === 0 && nextAuth.length === 0) {
+    if (
+      nextIp.length === 0 &&
+      nextDeny.length === 0 &&
+      nextGeo.length === 0 &&
+      nextAuth.length === 0
+    ) {
       throw new AppException(
         ErrorCode.VALIDATION_FAILED,
-        'At least one IP/CIDR or one Basic Auth user is required',
+        'At least one IP/CIDR, country, or Basic Auth user is required',
         400,
       );
     }
@@ -269,6 +318,8 @@ export class AccessGroupsService {
       data: {
         ...(parsed.data.name !== undefined ? { name: parsed.data.name.trim() } : {}),
         ipAllowlist: nextIp,
+        ipDenylist: nextDeny,
+        geoDenylist: nextGeo,
         authUsers: nextAuth,
       },
     });

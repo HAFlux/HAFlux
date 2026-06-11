@@ -1,24 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import { Node } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service';
+import { SshKeysService } from '../ssh-keys.service';
 import { LocalTransport } from './local.transport';
 import { SshTransport } from './ssh.transport';
 import { NodeTransport } from './transport.interface';
 
 @Injectable()
 export class TransportFactory {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly sshKeys: SshKeysService) {}
 
   async forNode(node: Node): Promise<NodeTransport> {
     if (node.transport === 'LOCAL') {
       return new LocalTransport(node);
     }
-    // SSH: достаём приватный ключ панели (TODO: расшифровка через ENCRYPTION_KEY)
-    const key = await this.prisma.sshKey.findFirst();
-    if (!key) {
-      throw new Error('SSH key not configured. Settings → SSH key → Generate.');
-    }
-    const privateKeyPem = Buffer.from(key.encryptedPrivKey).toString('utf8'); // TODO: decrypt envelope
+    // SSH: приватный ключ панели расшифровывается envelope'ом (CryptoService)
+    const privateKeyPem = await this.sshKeys.privateKeyPem();
     return new SshTransport(node, privateKeyPem);
   }
 }

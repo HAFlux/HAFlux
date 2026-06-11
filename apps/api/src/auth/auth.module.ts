@@ -6,6 +6,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { BootstrapService } from './bootstrap.service';
 import { JwtStrategy } from './jwt.strategy';
+import { LoginThrottleService } from './login-throttle.service';
 import { MeController } from './me.controller';
 
 @Module({
@@ -22,7 +23,7 @@ import { MeController } from './me.controller';
     }),
   ],
   controllers: [AuthController, MeController],
-  providers: [AuthService, JwtStrategy, BootstrapService],
+  providers: [AuthService, JwtStrategy, BootstrapService, LoginThrottleService],
   exports: [AuthService],
 })
 export class AuthModule {}

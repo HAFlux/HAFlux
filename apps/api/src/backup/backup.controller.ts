@@ -21,7 +21,7 @@ export class BackupController {
     const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
     reply
       .header('Content-Type', 'application/json; charset=utf-8')
-      .header('Content-Disposition', `attachment; filename="hpm-backup-${stamp}.json"`)
+      .header('Content-Disposition', `attachment; filename="haflux-backup-${stamp}.json"`)
       .send(JSON.stringify(payload));
   }
 

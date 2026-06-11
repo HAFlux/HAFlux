@@ -9,7 +9,7 @@ import ru from './ru.json';
  * Простая i18n конфигурация:
  *  - fallback EN
  *  - автодетект из navigator.language (Browser detector)
- *  - сохранение выбора в localStorage (key: 'hpm:lang')
+ *  - сохранение выбора в localStorage (key: 'haflux:lang')
  *  - переключатель в шапке вызывает i18n.changeLanguage('en'|'ru')
  */
 i18n
@@ -26,7 +26,7 @@ i18n
     },
     detection: {
       order: ['localStorage', 'navigator'],
-      lookupLocalStorage: 'hpm:lang',
+      lookupLocalStorage: 'haflux:lang',
       caches: ['localStorage'],
     },
   });

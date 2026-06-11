@@ -44,11 +44,13 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      WEB_PORT: ${WEB_PORT:-8080}
       DATABASE_URL: postgres://${POSTGRES_USER}:${DB_PASSWORD}@db:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
-      ALLOWED_ORIGINS: http://${PUBLIC_HOST}
+      # Панель живёт на кастомном WEB_PORT (http в dev, https после install.sh)
+      ALLOWED_ORIGINS: http://${PUBLIC_HOST}:${WEB_PORT:-8080},https://${PUBLIC_HOST}:${WEB_PORT:-8080}
       BOOTSTRAP_ROOT_EMAIL: ${BOOTSTRAP_ROOT_EMAIL}
       BOOTSTRAP_ROOT_PASSWORD: ${BOOTSTRAP_ROOT_PASSWORD}
       HAPROXY_CONTAINER_NAME: haproxy-balancer

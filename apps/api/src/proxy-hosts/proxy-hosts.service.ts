@@ -16,11 +16,9 @@ export interface CreateProxyHostInput {
   certificateId?: string | null;
   accessGroupIds?: string[];
   httpToHttps?: boolean;
-  hsts?: boolean;
   blockExploits?: boolean;
   wsSupport?: boolean;
   http2?: boolean;
-  http3?: boolean;
   notes?: string | null;
   customHeaders?: Record<string, string> | null;
   /** Путь GET для health probe; пустой/null = «/». */
@@ -109,11 +107,9 @@ export class ProxyHostsService {
         ssl: input.ssl ?? true,
         certificateId: input.certificateId ?? null,
         httpToHttps: input.httpToHttps ?? true,
-        hsts: input.hsts ?? false,
         blockExploits: input.blockExploits ?? true,
         wsSupport: input.wsSupport ?? true,
         http2: input.http2 ?? true,
-        http3: input.http3 ?? false,
         notes: input.notes ?? null,
         ...(() => {
           const ch = this.normalizeCustomHeadersJson(input.customHeaders);
@@ -167,11 +163,9 @@ export class ProxyHostsService {
         ssl: input.ssl,
         certificateId: input.certificateId,
         httpToHttps: input.httpToHttps,
-        hsts: input.hsts,
         blockExploits: input.blockExploits,
         wsSupport: input.wsSupport,
         http2: input.http2,
-        http3: input.http3,
         enabled: input.enabled,
         notes: input.notes,
         ...(input.customHeaders !== undefined

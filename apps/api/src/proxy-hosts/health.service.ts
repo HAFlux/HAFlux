@@ -1,5 +1,6 @@
 import * as http from 'node:http';
 import * as https from 'node:https';
+import net from 'node:net';
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProxyHostsService } from './proxy-hosts.service';
@@ -113,6 +114,48 @@ export class ProxyHostsHealthService implements OnModuleInit, OnModuleDestroy {
       }),
     );
     this.logger.debug(`probed ${hosts.length} proxy hosts`);
+  }
+
+  /**
+   * Ad-hoc probe несохранённого upstream'а (кнопка «проверить» в модалке).
+   * Ничего не пишет в БД. Для tcp — проверка TCP connect, udp не проверяем.
+   */
+  async probeAdHoc(
+    scheme: 'http' | 'https' | 'tcp' | 'udp',
+    host: string,
+    port: number,
+  ): Promise<{
+    status: 'HEALTHY' | 'UNHEALTHY' | 'DEGRADED' | 'UNKNOWN';
+    code: number | null;
+    latencyMs: number | null;
+    error: string | null;
+  }> {
+    if (scheme === 'udp') {
+      return { status: 'UNKNOWN', code: null, latencyMs: null, error: 'UDP probe not supported' };
+    }
+    if (scheme === 'tcp') {
+      return this.probeTcp(host, port);
+    }
+    return this.probe(`${scheme}://${host}:${port}/`);
+  }
+
+  private probeTcp(host: string, port: number) {
+    const t0 = Date.now();
+    return new Promise<{
+      status: 'HEALTHY' | 'UNHEALTHY';
+      code: null;
+      latencyMs: number;
+      error: string | null;
+    }>((resolve) => {
+      const socket = net.connect({ host, port, timeout: this.probeTimeoutMs });
+      const done = (status: 'HEALTHY' | 'UNHEALTHY', error: string | null) => {
+        socket.destroy();
+        resolve({ status, code: null, latencyMs: Date.now() - t0, error });
+      };
+      socket.once('connect', () => done('HEALTHY', null));
+      socket.once('timeout', () => done('UNHEALTHY', 'connect timeout'));
+      socket.once('error', (err) => done('UNHEALTHY', err.message.slice(0, 200)));
+    });
   }
 
   /** Manual probe (для refresh-кнопки в UI). */

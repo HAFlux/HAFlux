@@ -1,5 +1,8 @@
 {
-  "app": { "name": "HPM", "tagline": "HAProxy Packet Manager" },
+  "app": {
+    "name": "HAFlux",
+    "tagline": "Multi-HAProxy control plane"
+  },
   "nav": {
     "dashboard": "Главная",
     "proxyHosts": "Хосты прокси",
@@ -47,7 +50,10 @@
     "verifying": "Проверка…",
     "renewing": "Обновление…",
     "issuing": "Выпуск…",
-    "updating": "Обновление…"
+    "updating": "Обновление…",
+    "copy": "Копировать",
+    "apply": "Применить",
+    "applying": "Применение…"
   },
   "login": {
     "title": "Войти",
@@ -131,7 +137,18 @@
       "ACTIVE_PASSIVE": "Master + standby (Keepalived/VRRP)",
       "ACTIVE_ACTIVE": "Все ноды обрабатывают трафик параллельно"
     },
-    "modeHelpSummary": "Топология кластера: одна нода, пара с переключением при отказе или несколько активных нод."
+    "modeHelpSummary": "Топология кластера: одна нода, пара с переключением при отказе или несколько активных нод.",
+    "logFormatLabel": "Кастомный формат логов",
+    "logFormatPlaceholder": "%ci:%cp [%tr] %ft %b/%s %ST %B %{+Q}r",
+    "logFormatHint": "HAProxy log-format для фронтендов :80/:443. Пусто = стандартный httplog. Конфиг проверяется (haproxy -c) до reload; битый формат отклоняется и откатывается.",
+    "nodesBtn": "Ноды",
+    "applyResultTitle": "Применение: {{name}}",
+    "applyResultDesc": "Рендер и доставка конфигурации кластера.",
+    "applyHosts": "Применено прокси-хостов: {{count}}",
+    "applyCerts": "Загружено сертификатов: {{count}}",
+    "applyOk": "✓ Конфигурация доставлена, HAProxy перезагружен.",
+    "applyFailed": "✗ Ошибка применения: {{error}}",
+    "applyNodesLabel": "Ноды"
   },
   "certificates": {
     "title": "Сертификаты",
@@ -248,7 +265,6 @@
     "healthCheckPathPlaceholder": "/health или /api/ping",
     "healthCheckPathHint": "Пусто — запрос GET на корень «/». Только путь (не полный URL), без «..».",
     "helpHealthCheckPath": "Используется для кнопки «Проверить» и фонового пинга раз в ~60 с. Запрос идёт на upstream с заголовком Host = ваш публичный домен (как у браузера). Не влияет на маршрутизацию HAProxy.",
-    "helpHttp3": "HTTP/3 использует QUIC (UDP) вместе с TLS на TCP :443.",
     "helpCustomHeaders": "Добавляются как http-request set-header к upstream. Имена при сохранении приводятся к нижнему регистру.",
     "tagListen": "listen :{{port}}",
     "ssl": "// SSL / TLS",
@@ -265,12 +281,8 @@
     "accessGroupMustAssign": "Группа должна быть отмечена здесь и хост сохранён — иначе HAProxy не добавит правила для этого домена.",
     "forceHttps": "Принудительный HTTP → HTTPS",
     "forceHttpsHint": "301 redirect с :80 на :443 для этого домена.",
-    "hsts": "HSTS",
-    "hstsHint": "Strict-Transport-Security: max-age=31536000; includeSubDomains",
     "http2": "HTTP/2",
     "http2Hint": "Активировать ALPN h2,http/1.1 на bind :443. Безопасный апгрейд.",
-    "http3": "HTTP/3 (QUIC)",
-    "http3Hint": "Дополнительный bind quic4@:443 + Alt-Svc для рекламы. UDP.",
     "wsSupport": "WebSocket поддержка",
     "wsSupportHint": "Форвардить Upgrade/Connection заголовки + увеличенные таймауты.",
     "blockExploits": "Блокировать частые эксплоиты",
@@ -304,9 +316,7 @@
     "tagTls": "TLS",
     "tagCert": "серт: {{name}}",
     "tag443": "→ 443",
-    "tagHsts": "HSTS",
     "tagH2": "h2",
-    "tagH3": "h3",
     "tagWs": "ws",
     "tagBlockExploits": "block-exploits",
     "tagDisabled": "выкл",
@@ -326,7 +336,11 @@
       "domainInvalid": "нужен корректный FQDN; wildcard *. допустим",
       "forwardRequired": "укажите хост upstream",
       "forwardInvalid": "должен быть IP, hostname или «localhost»"
-    }
+    },
+    "probeButton": "Проверить апстрим",
+    "probeChecking": "Проверяю…",
+    "probeReachable": "доступен",
+    "probeUnreachable": "недоступен"
   },
   "profile": {
     "title": "Профиль",
@@ -363,7 +377,7 @@
     "badgeDefault": "по умолчанию",
     "reset": "Вернуть по умолчанию",
     "resetting": "Восстановление…",
-    "hintReload": "Пока не сохраните свою версию, используются шаблоны HPM. Сохранение применяет конфиг и отправляет SIGUSR2 контейнеру HAProxy.",
+    "hintReload": "Пока не сохраните свою версию, используются шаблоны HAFlux. Сохранение применяет конфиг и отправляет SIGUSR2 контейнеру HAProxy.",
     "saveSuccess": "✓ Сохранено, HAProxy перезагружен.",
     "resetSuccess": "✓ Шаблон по умолчанию восстановлен, HAProxy перезагружен.",
     "saveFailed": "Не удалось сохранить",
@@ -374,18 +388,18 @@
     "kicker": "// IP + Basic Auth",
     "subtitle": "Правила IP и Basic Auth попадают в HAProxy только если группа привязана к конкретному прокси-хосту (домену). Одна группа в этом списке ещё ничего не блокирует.",
     "calloutTitle": "Важно",
-    "calloutBody": "Сохранённая группа доступа не действует, пока вы не откроете «Прокси-хосты» → нужный домен → блок «Контроль доступа» → отметите группы и сохраните хост.\n\nПанель HPM по умолчанию идёт на backend панели без этих ACL. Чтобы закрыть сам URL панели, создайте для того же домена запись прокси-хоста (upstream — ваш API/панель), HTTPS и привязку группы.\n\nЗа Cloudflare или другим прокси HAProxy видит IP прокси, не клиента — учитывайте это в allowlist или используйте Basic Auth.",
+    "calloutBody": "Сохранённая группа доступа не действует, пока вы не откроете «Прокси-хосты» → нужный домен → блок «Контроль доступа» → отметите группы и сохраните хост.\n\nПанель HAFlux по умолчанию идёт на backend панели без этих ACL. Чтобы закрыть сам URL панели, создайте для того же домена запись прокси-хоста (upstream — ваш API/панель), HTTPS и привязку группы.\n\nЗа Cloudflare или другим прокси HAProxy видит IP прокси, не клиента — учитывайте это в allowlist или используйте Basic Auth.",
     "newGroup": "+ Новая группа",
     "noClusters": "Кластеров пока нет",
     "noClustersHint": "Создайте кластер в разделе «{{clusters}}», затем настройте группы.",
     "empty": "Групп доступа нет",
     "emptyHint": "Создайте группу со списком IP и/или пользователями. Пока к хосту не привязана группа, доступ остаётся открытым.",
-    "metaLine": "{{ips}} IP · {{users}} польз. · {{hosts}} хостов",
+    "metaLine": "{{ips}} IP · {{denies}} заблок. · {{geo}} стран · {{users}} юзеров · {{hosts}} хостов",
     "deleteTitle": "Удалить группу доступа",
     "deleteDesc": "Группа «{{name}}» будет удалена. С хостов прокси она снимется (доступ снова открыт).",
     "modalCreateTitle": "Новая группа доступа",
     "modalEditTitle": "Редактировать группу",
-    "modalDesc": "Нужен хотя бы один IP/CIDR в списке или один пользователь Basic Auth с паролем.",
+    "modalDesc": "Укажите хотя бы одну строку IP/CIDR (разрешённую или заблокированную) или одного Basic Auth пользователя с паролем.",
     "nameLabel": "Имя",
     "namePlaceholder": "only-office",
     "ipLabel": "Разрешённые IP клиентов (по одному в строке)",
@@ -396,7 +410,13 @@
     "authPass": "пароль",
     "authPassKeep": "новый пароль (пусто = не менять)",
     "authHint": "Логин: буквы, цифры, подчёркивание. Вместе с IP: клиент должен подойти по IP и пройти аутентификацию.",
-    "addUser": "+ Пользователь"
+    "addUser": "+ Пользователь",
+    "denyLabel": "Заблокированные IP (по одному в строке)",
+    "denyPlaceholder": "198.51.100.7\n203.0.113.0/24",
+    "denyHint": "Эти IP всегда получают HTTP 403 — проверяются раньше allowlist и Basic Auth.",
+    "geoLabel": "Заблокированные страны (GeoIP)",
+    "geoSearchPlaceholder": "поиск страны…",
+    "geoHint": "Запросы из выбранных стран получают HTTP 403. IP-диапазоны скачиваются с ipdeny.com при apply и обновляются раз в неделю."
   },
   "backup": {
     "kicker": "// Бэкап",
@@ -413,14 +433,14 @@
     "restoring": "Восстановление...",
     "confirmTitle": "Подтверждение",
     "confirmBody": "Все текущие данные будут стерты и заменены на содержимое бэкапа. Действие необратимо.",
-    "invalidFile": "Файл не является корректным бэкапом HPM.",
+    "invalidFile": "Файл не является корректным бэкапом HAFlux.",
     "downloadOk": "Бэкап скачан",
     "restoreOk": "Бэкап восстановлен"
   },
   "help": {
     "kicker": "// Справка",
-    "title": "О HPM",
-    "lead": "HPM (HAProxy Packet Manager) — control plane для нескольких HAProxy: сертификаты, рендер конфигов и правила прокси по аналогии с NPM, только для HAProxy.",
+    "title": "О HAFlux",
+    "lead": "HAFlux — control plane для нескольких HAProxy: сертификаты, рендер конфигов и правила прокси по аналогии с NPM, только для HAProxy.",
     "glossaryTitle": "Глоссарий",
     "terms": {
       "cluster": {
@@ -454,5 +474,26 @@
     "optional": "опционально",
     "error": "Ошибка: {{message}}",
     "failed": "Ошибка"
+  },
+  "nodes": {
+    "title": "Ноды — {{name}}",
+    "desc": "HAProxy-ноды этого кластера. Конфигурация рендерится один раз и доставляется на каждую ноду.",
+    "sshKeyLabel": "Публичный SSH-ключ панели",
+    "sshKeyHint": "Добавьте этот ключ в ~/.ssh/authorized_keys SSH-пользователя на каждой удалённой ноде.",
+    "test": "Тест",
+    "promote": "Сделать primary",
+    "empty": "Нод пока нет. Добавьте LOCAL-ноду (эта машина) или SSH-ноду.",
+    "add": "+ Добавить ноду",
+    "name": "Имя",
+    "transport": "Транспорт",
+    "sshHost": "SSH-хост",
+    "sshPort": "SSH-порт",
+    "sshUser": "SSH-пользователь",
+    "dataDir": "Каталог HAProxy",
+    "reloadMode": "Режим reload",
+    "reloadTarget": "Цель reload",
+    "reloadTargetPlaceholder": "сервис / контейнер / pid-файл / сокет (дефолт по режиму)",
+    "role": "Роль",
+    "layoutHint": "Авто-failover (ACTIVE_PASSIVE) переключает только роли PRIMARY/SECONDARY — переключение трафика требует VIP/keepalived или DNS."
   }
 }
