@@ -272,3 +272,10 @@ export function countryName(code: string, lang: string): string {
     return code.toUpperCase();
   }
 }
+
+/** Эмодзи-флаг страны из ISO-кода: 'ru' → 🇷🇺 (региональные индикаторы Unicode). */
+export function countryFlag(code: string): string {
+  const cc = code.toUpperCase();
+  if (!/^[A-Z]{2}$/.test(cc)) return '';
+  return String.fromCodePoint(0x1f1e6 + (cc.charCodeAt(0) - 65), 0x1f1e6 + (cc.charCodeAt(1) - 65));
+}

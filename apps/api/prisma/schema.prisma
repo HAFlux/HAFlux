@@ -689,6 +689,8 @@ model AccessGroup {
   ipDenylist  Json     @default("[]")
   /// Гео-блокировка: ISO 3166-1 alpha-2 коды стран (lowercase), которым доступ запрещён.
   geoDenylist Json     @default("[]")
+  /// Гео-allowlist: ISO коды стран, ТОЛЬКО из которых разрешён доступ (пусто = без ограничения).
+  geoAllowlist Json    @default("[]")
   /// [{ "username": string, "passwordEnc": base64 envelope }]
   authUsers   Json     @default("[]")
   createdAt   DateTime @default(now())

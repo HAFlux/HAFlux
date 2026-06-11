@@ -66,6 +66,8 @@ interface ResolvedAccessGroup {
   denyLines: string[];
   /** ISO 3166-1 alpha-2 (lowercase) — страны под гео-блокировкой. */
   geoCodes: string[];
+  /** ISO коды стран, ТОЛЬКО из которых разрешён доступ (пусто = без ограничения). */
+  geoAllowCodes: string[];
   users: { username: string; passwordPlain: string }[];
 }
 
@@ -233,7 +235,9 @@ export class ProxyHostsRenderApplyService {
     const errorFiles = await this.writeErrorFiles(clusterId);
     const aclFiles = await this.writeAccessGroupFiles(groupsById);
     // Гео-списки: скачиваем/обновляем geo_<cc>.lst для всех стран из групп
-    const neededGeo = Array.from(new Set([...groupsById.values()].flatMap((g) => g.geoCodes)));
+    const neededGeo = Array.from(
+      new Set([...groupsById.values()].flatMap((g) => [...g.geoCodes, ...g.geoAllowCodes])),
+    );
     await this.geoLists.ensure(neededGeo);
 
     const hasCerts = certFileById.size > 0;
@@ -393,14 +397,14 @@ export class ProxyHostsRenderApplyService {
     } catch (err) {
       const e = err as { stderr?: string; stdout?: string; message?: string };
       const output = (e.stderr || e.stdout || e.message || String(err)).trim();
-      // Ошибка docker'а (нет контейнера/демона) — не вина конфига.
-      if (
-        /error response from daemon|no such container|cannot connect to the docker/i.test(output)
-      ) {
-        this.logger.warn(`haproxy -c unavailable, skipping validation: ${output}`);
-        return { ok: true, output };
+      // Конфиг забракован, только если ругается сам haproxy ([ALERT]/fatal).
+      // Любая инфраструктурная ошибка (docker CLI/демон/контейнер недоступны,
+      // таймаут) — не вина конфига: пропускаем валидацию, проблему покажет reload.
+      if (/\[ALERT\]|fatal errors found|parsing \[/i.test(output)) {
+        return { ok: false, output };
       }
-      return { ok: false, output };
+      this.logger.warn(`haproxy -c unavailable, skipping validation: ${output}`);
+      return { ok: true, output };
     }
   }
 
@@ -512,6 +516,9 @@ p{margin:1rem 0 0;line-height:1.6;opacity:.8;font-size:14px}
     const geoCodes = ((row.geoDenylist as string[]) ?? [])
       .map((x) => x.trim().toLowerCase())
       .filter((x) => /^[a-z]{2}$/.test(x));
+    const geoAllowCodes = ((row.geoAllowlist as string[]) ?? [])
+      .map((x) => x.trim().toLowerCase())
+      .filter((x) => /^[a-z]{2}$/.test(x));
     const rawUsers = (row.authUsers as { username: string; passwordEnc: string }[]) ?? [];
     const users = rawUsers.map((u) => ({
       username: u.username,
@@ -525,6 +532,7 @@ p{margin:1rem 0 0;line-height:1.6;opacity:.8;font-size:14px}
       ipLines: ips,
       denyLines: denies,
       geoCodes,
+      geoAllowCodes,
       users,
     };
   }
@@ -692,6 +700,7 @@ global
           if (g?.hasDeny) feHttpDenyGroupIds.add(gid);
           for (const cc of g?.geoCodes ?? []) feHttpGeoCodes.add(cc);
           if (h.ssl && h.httpToHttps) continue;
+          for (const cc of g?.geoAllowCodes ?? []) feHttpGeoCodes.add(cc);
           if (g?.hasIp) feHttpGroupIds.add(gid);
         }
       }
@@ -755,6 +764,14 @@ global
         const negations = ipGids.map((gid) => `!${this.aclSrcName(gid)}`).join(' ');
         out.push(`  http-request deny deny_status 403 if host_${h.id} ${negations}`);
       }
+      // Гео-allowlist: доступ только из перечисленных стран (объединение по группам).
+      const geoAllow = Array.from(
+        new Set(h.accessGroupIds.flatMap((gid) => groupsById.get(gid)?.geoAllowCodes ?? [])),
+      );
+      if (geoAllow.length > 0) {
+        const negations = geoAllow.map((cc) => `!${this.aclGeoName(cc)}`).join(' ');
+        out.push(`  http-request deny deny_status 403 if host_${h.id} ${negations}`);
+      }
       const needsAuth = h.accessGroupIds.some((gid) => groupsById.get(gid)?.hasAuth);
       if (needsAuth) {
         const ulName = this.hostMergedUlName(h.id);
@@ -816,6 +833,7 @@ global
             if (g?.hasIp) feHttpsGroupIds.add(gid);
             if (g?.hasDeny) feHttpsDenyGroupIds.add(gid);
             for (const cc of g?.geoCodes ?? []) feHttpsGeoCodes.add(cc);
+            for (const cc of g?.geoAllowCodes ?? []) feHttpsGeoCodes.add(cc);
           }
         }
         for (const gid of feHttpsDenyGroupIds) {
@@ -864,6 +882,14 @@ global
         const ipGids = h.accessGroupIds.filter((gid) => groupsById.get(gid)?.hasIp);
         if (ipGids.length > 0) {
           const negations = ipGids.map((gid) => `!${this.aclSrcName(gid)}`).join(' ');
+          out.push(`  http-request deny deny_status 403 if host_${h.id} ${negations}`);
+        }
+        // Гео-allowlist: доступ только из перечисленных стран (объединение по группам).
+        const geoAllow = Array.from(
+          new Set(h.accessGroupIds.flatMap((gid) => groupsById.get(gid)?.geoAllowCodes ?? [])),
+        );
+        if (geoAllow.length > 0) {
+          const negations = geoAllow.map((cc) => `!${this.aclGeoName(cc)}`).join(' ');
           out.push(`  http-request deny deny_status 403 if host_${h.id} ${negations}`);
         }
         const needsAuth = h.accessGroupIds.some((gid) => groupsById.get(gid)?.hasAuth);
