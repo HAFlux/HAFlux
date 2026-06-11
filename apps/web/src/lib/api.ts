@@ -145,6 +145,8 @@ export interface AccessGroupSummary {
   id: string;
   name: string;
   ipCount: number;
+  denyCount: number;
+  geoCount: number;
   userCount: number;
   proxyHostCount: number;
   createdAt: string;
@@ -153,6 +155,8 @@ export interface AccessGroupSummary {
 
 export interface AccessGroupDetail extends AccessGroupSummary {
   ipAllowlist: string[];
+  ipDenylist: string[];
+  geoDenylist: string[];
   users: { username: string; hasPassword: boolean }[];
 }
 
@@ -170,6 +174,53 @@ export interface Certificate {
 
 export type ForwardScheme = 'http' | 'https' | 'tcp' | 'udp';
 
+export interface ClusterNode {
+  id: string;
+  clusterId: string;
+  name: string;
+  transport: 'LOCAL' | 'SSH';
+  sshHost: string | null;
+  sshPort: number | null;
+  sshUser: string | null;
+  haproxyDataDir: string;
+  reloadMode: 'CONTAINER' | 'SYSTEMD' | 'SIGNAL' | 'MASTER_CLI';
+  reloadTarget: string | null;
+  haproxyVersion: string | null;
+  status: 'UNKNOWN' | 'ONLINE' | 'OFFLINE' | 'DEGRADED';
+  role: 'PRIMARY' | 'SECONDARY';
+  lastSeenAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ClusterNodeInput {
+  name?: string;
+  transport?: 'LOCAL' | 'SSH';
+  sshHost?: string | null;
+  sshPort?: number;
+  sshUser?: string;
+  haproxyDataDir?: string;
+  reloadMode?: 'CONTAINER' | 'SYSTEMD' | 'SIGNAL' | 'MASTER_CLI';
+  reloadTarget?: string | null;
+  role?: 'PRIMARY' | 'SECONDARY';
+}
+
+export interface ApplyNodeResult {
+  nodeId: string;
+  nodeName: string;
+  transport: 'LOCAL' | 'SSH';
+  ok: boolean;
+  error?: string;
+}
+
+export interface ApplyResult {
+  hostsApplied: number;
+  certsLoaded: number;
+  reloadOk: boolean;
+  reloadError?: string;
+  nodes: ApplyNodeResult[];
+}
+
 export interface ProxyHost {
   id: string;
   clusterId: string;
@@ -181,11 +232,9 @@ export interface ProxyHost {
   ssl: boolean;
   certificateId: string | null;
   httpToHttps: boolean;
-  hsts: boolean;
   blockExploits: boolean;
   wsSupport: boolean;
   http2: boolean;
-  http3: boolean;
   enabled: boolean;
   notes: string | null;
   /** GET path для проверки upstream; null = «/». */
@@ -212,11 +261,9 @@ export interface CreateProxyHostInput {
   ssl?: boolean;
   certificateId?: string | null;
   httpToHttps?: boolean;
-  hsts?: boolean;
   blockExploits?: boolean;
   wsSupport?: boolean;
   http2?: boolean;
-  http3?: boolean;
   notes?: string | null;
   healthCheckPath?: string | null;
   customHeaders?: Record<string, string> | null;
@@ -252,6 +299,7 @@ export const api = {
           id: string;
           name: string;
           mode: string;
+          logFormat?: string | null;
           orgId?: string;
           createdAt: string;
           updatedAt?: string;
@@ -267,7 +315,11 @@ export const api = {
       }),
     update: (
       id: string,
-      input: { name?: string; mode?: 'STANDALONE' | 'ACTIVE_PASSIVE' | 'ACTIVE_ACTIVE' },
+      input: {
+        name?: string;
+        mode?: 'STANDALONE' | 'ACTIVE_PASSIVE' | 'ACTIVE_ACTIVE';
+        logFormat?: string | null;
+      },
     ) =>
       request<{ id: string; name: string; mode: string }>(`/clusters/${id}`, {
         method: 'PATCH',
@@ -276,6 +328,39 @@ export const api = {
       }),
     delete: (id: string) =>
       request<{ ok: true }>(`/clusters/${id}`, { method: 'DELETE', auth: true }),
+    apply: (id: string) =>
+      request<ApplyResult>(`/clusters/${id}/apply`, { method: 'POST', auth: true }),
+    nodes: {
+      list: (clusterId: string) =>
+        request<ClusterNode[]>(`/clusters/${clusterId}/nodes`, { auth: true }),
+      create: (clusterId: string, input: ClusterNodeInput) =>
+        request<ClusterNode>(`/clusters/${clusterId}/nodes`, {
+          method: 'POST',
+          body: JSON.stringify(input),
+          auth: true,
+        }),
+      update: (clusterId: string, nodeId: string, input: ClusterNodeInput) =>
+        request<ClusterNode>(`/clusters/${clusterId}/nodes/${nodeId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(input),
+          auth: true,
+        }),
+      delete: (clusterId: string, nodeId: string) =>
+        request<{ ok: true }>(`/clusters/${clusterId}/nodes/${nodeId}`, {
+          method: 'DELETE',
+          auth: true,
+        }),
+      test: (clusterId: string, nodeId: string) =>
+        request<{ ok: boolean; detail: string | null; durationMs: number; node: ClusterNode }>(
+          `/clusters/${clusterId}/nodes/${nodeId}/test`,
+          { method: 'POST', auth: true },
+        ),
+      promote: (clusterId: string, nodeId: string) =>
+        request<ClusterNode[]>(`/clusters/${clusterId}/nodes/${nodeId}/promote`, {
+          method: 'POST',
+          auth: true,
+        }),
+    },
     errorFiles: {
       list: (clusterId: string) =>
         request<ClusterErrorFileItem[]>(`/clusters/${clusterId}/error-files`, { auth: true }),
@@ -303,6 +388,8 @@ export const api = {
         input: {
           name: string;
           ipAllowlist: string[];
+          ipDenylist: string[];
+          geoDenylist: string[];
           users: { username: string; password: string }[];
         },
       ) =>
@@ -317,6 +404,8 @@ export const api = {
         input: {
           name?: string;
           ipAllowlist?: string[];
+          ipDenylist?: string[];
+          geoDenylist?: string[];
           users?: { username: string; password?: string }[];
         },
       ) =>
@@ -440,6 +529,17 @@ export const api = {
         method: 'POST',
         auth: true,
       }),
+    probe: (input: { forwardScheme: ForwardScheme; forwardHost: string; forwardPort: number }) =>
+      request<{
+        status: 'HEALTHY' | 'UNHEALTHY' | 'DEGRADED' | 'UNKNOWN';
+        code: number | null;
+        latencyMs: number | null;
+        error: string | null;
+      }>('/proxy-hosts/probe', {
+        method: 'POST',
+        body: JSON.stringify(input),
+        auth: true,
+      }),
 
     logs: (id: string) =>
       request<
@@ -487,7 +587,7 @@ export const api = {
       }
       const cd = res.headers.get('Content-Disposition') ?? '';
       const m = cd.match(/filename="([^"]+)"/);
-      const filename = m?.[1] ?? 'hpm-backup.json';
+      const filename = m?.[1] ?? 'haflux-backup.json';
       const blob = await res.blob();
       return { blob, filename };
     },
@@ -495,6 +595,12 @@ export const api = {
       request<{ restored: Record<string, number> }>('/backup/restore', {
         method: 'POST',
         body: JSON.stringify(payload),
+        auth: true,
+      }),
+  },
+  sshKey: {
+    get: () =>
+      request<{ publicKey: string; comment: string; createdAt: string }>('/ssh-key', {
         auth: true,
       }),
   },

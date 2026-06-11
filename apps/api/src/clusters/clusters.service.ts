@@ -1,10 +1,16 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { AppException, ErrorCode } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
+import { ProxyHostsRenderApplyService } from '../proxy-hosts/render-apply.service';
 
 @Injectable()
 export class ClustersService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(ClustersService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly renderApply: ProxyHostsRenderApplyService,
+  ) {}
 
   list() {
     return this.prisma.cluster.findMany({ orderBy: { createdAt: 'desc' } });
@@ -12,7 +18,11 @@ export class ClustersService {
 
   async update(
     id: string,
-    input: { name?: string; mode?: 'STANDALONE' | 'ACTIVE_PASSIVE' | 'ACTIVE_ACTIVE' },
+    input: {
+      name?: string;
+      mode?: 'STANDALONE' | 'ACTIVE_PASSIVE' | 'ACTIVE_ACTIVE';
+      logFormat?: string | null;
+    },
   ) {
     const existing = await this.prisma.cluster.findUnique({ where: { id } });
     if (!existing) throw new AppException(ErrorCode.CLUSTER_NOT_FOUND, 'Cluster not found', 404);
@@ -29,13 +39,25 @@ export class ClustersService {
         );
     }
 
-    return this.prisma.cluster.update({
+    const logFormatChanged =
+      input.logFormat !== undefined && (input.logFormat || null) !== existing.logFormat;
+
+    const updated = await this.prisma.cluster.update({
       where: { id },
       data: {
         name: input.name,
         mode: input.mode,
+        ...(input.logFormat !== undefined ? { logFormat: input.logFormat || null } : {}),
       },
     });
+
+    // log-format попадает в haproxy.cfg → нужен re-apply. apply() сам
+    // валидирует конфиг (haproxy -c) и откатывает при ошибке.
+    if (logFormatChanged) {
+      await this.renderApply.apply(id);
+    }
+
+    return updated;
   }
 
   /** Расширенная инфа для UI: счётчики ProxyHost / Node. */
@@ -55,6 +77,7 @@ export class ClustersService {
       id: c.id,
       name: c.name,
       mode: c.mode,
+      logFormat: c.logFormat,
       orgId: c.orgId,
       createdAt: c.createdAt,
       updatedAt: c.updatedAt,
@@ -80,13 +103,34 @@ export class ClustersService {
         409,
       );
 
-    return this.prisma.cluster.create({
+    const created = await this.prisma.cluster.create({
       data: {
         orgId,
         name: input.name,
         mode: input.mode ?? 'STANDALONE',
       },
     });
+
+    // Первый кластер инсталляции получает LOCAL-ноду автоматически —
+    // это сохраняет однокомандный single-host опыт (install.sh).
+    const localExists = await this.prisma.node.findFirst({ where: { transport: 'LOCAL' } });
+    if (!localExists) {
+      await this.prisma.node.create({
+        data: {
+          clusterId: created.id,
+          name: 'local',
+          transport: 'LOCAL',
+          haproxyDataDir: process.env.HAPROXY_DATA_DIR ?? '/haproxy-data',
+          reloadMode: 'CONTAINER',
+          reloadTarget: process.env.HAPROXY_CONTAINER_NAME ?? 'haproxy-balancer',
+          role: 'PRIMARY',
+          status: 'ONLINE',
+          lastSeenAt: new Date(),
+        },
+      });
+    }
+
+    return created;
   }
 
   async get(id: string) {

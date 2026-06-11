@@ -17,6 +17,7 @@ import { zodToAppException } from '../common/zod-to-error';
 import { ProxyHostsHealthService } from './health.service';
 import { HaproxyLogsService } from './logs.service';
 import { ProxyHostsService } from './proxy-hosts.service';
+import { ProxyHostsRenderApplyService } from './render-apply.service';
 
 const DomainSchema = z
   .string()
@@ -43,11 +44,9 @@ const CreateSchema = z.object({
   ssl: z.boolean().optional(),
   certificateId: z.string().nullable().optional(),
   httpToHttps: z.boolean().optional(),
-  hsts: z.boolean().optional(),
   blockExploits: z.boolean().optional(),
   wsSupport: z.boolean().optional(),
   http2: z.boolean().optional(),
-  http3: z.boolean().optional(),
   notes: z.string().nullable().optional(),
   accessGroupIds: z.array(z.string().min(1)).max(32).optional(),
   customHeaders: z
@@ -76,6 +75,12 @@ const UpdateSchema = CreateSchema.partial().extend({
   enabled: z.boolean().optional(),
 });
 
+const ProbeSchema = z.object({
+  forwardScheme: z.enum(['http', 'https', 'tcp', 'udp']).default('http'),
+  forwardHost: ForwardHostSchema,
+  forwardPort: z.number().int().min(1).max(65535),
+});
+
 @ApiTags('proxy-hosts')
 @ApiBearerAuth()
 @UseGuards(AuthGuard('jwt'))
@@ -85,11 +90,19 @@ export class ProxyHostsController {
     private readonly svc: ProxyHostsService,
     private readonly health: ProxyHostsHealthService,
     private readonly logs: HaproxyLogsService,
+    private readonly renderApply: ProxyHostsRenderApplyService,
   ) {}
 
   @Get('clusters/:clusterId/proxy-hosts')
   list(@Param('clusterId') clusterId: string) {
     return this.svc.list(clusterId);
+  }
+
+  /** Рендер + деплой конфига кластера на все его ноды (LOCAL + SSH). */
+  @Post('clusters/:clusterId/apply')
+  @HttpCode(200)
+  applyCluster(@Param('clusterId') clusterId: string) {
+    return this.renderApply.apply(clusterId);
   }
 
   @Post('proxy-hosts')
@@ -127,6 +140,20 @@ export class ProxyHostsController {
   @HttpCode(200)
   manualProbe(@Param('id') id: string) {
     return this.health.probeOne(id);
+  }
+
+  /** Проверка доступности upstream'а из формы (до сохранения хоста). */
+  @Post('proxy-hosts/probe')
+  @HttpCode(200)
+  probe(@Body() body: unknown) {
+    const parsed = ProbeSchema.safeParse(body);
+    if (!parsed.success) {
+      throw zodToAppException(parsed.error, {
+        forwardHost: ErrorCode.PROXY_HOST_FORWARD_HOST_INVALID,
+      });
+    }
+    const { forwardScheme, forwardHost, forwardPort } = parsed.data;
+    return this.health.probeAdHoc(forwardScheme, forwardHost, forwardPort);
   }
 
   @Get('proxy-hosts/:id/logs')

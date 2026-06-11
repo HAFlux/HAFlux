@@ -7,7 +7,18 @@ import { ConfigService } from '@nestjs/config';
 import { AccessGroup, ErrorFile } from '@prisma/client';
 import { CryptoService } from '../certificates/crypto.service';
 import { AppException, ErrorCode } from '../common/errors';
+import { TransportFactory } from '../haproxy/transports/transport.factory';
+import type { RenderedTree } from '../haproxy/types';
 import { PrismaService } from '../prisma/prisma.service';
+import { GeoListsService } from './geo-lists.service';
+
+export interface NodeDeployResult {
+  nodeId: string;
+  nodeName: string;
+  transport: 'LOCAL' | 'SSH';
+  ok: boolean;
+  error?: string;
+}
 
 const execAsync = promisify(exec);
 
@@ -38,11 +49,9 @@ interface ProxyHostWithAccess {
   ssl: boolean;
   certificateId: string | null;
   httpToHttps: boolean;
-  hsts: boolean;
   blockExploits: boolean;
   wsSupport: boolean;
   http2: boolean;
-  http3: boolean;
   enabled: boolean;
   accessGroupIds: string[];
   customHeaders: Record<string, string> | null;
@@ -51,16 +60,21 @@ interface ProxyHostWithAccess {
 interface ResolvedAccessGroup {
   id: string;
   hasIp: boolean;
+  hasDeny: boolean;
   hasAuth: boolean;
   ipLines: string[];
+  denyLines: string[];
+  /** ISO 3166-1 alpha-2 (lowercase) — страны под гео-блокировкой. */
+  geoCodes: string[];
   users: { username: string; passwordPlain: string }[];
 }
 
 /**
  * Рендер haproxy.cfg из ProxyHost'ов + сертификатов и hot-reload контейнера.
  *
- *  - Чтобы не сломать панель — конфиг продолжает роутить / и /api на
- *    web/api контейнеры панели (это поведение bootstrap).
+ *  - Панель доступна ТОЛЬКО на своём порту (WEB_PORT, default 8080) через
+ *    fe_panel. На :80/:443 живут только proxy host'ы; неизвестный домен
+ *    получает 404, а не панель.
  *  - Per-host логика: hdr(host) на :80 и :443. На HTTPS специально НЕ
  *    маршрутизируем по ssl_fc_sni — браузеры с HTTP/2 connection coalescing
  *    переиспользуют один TLS-сокет (один SNI) для нескольких хостов под общим
@@ -75,14 +89,20 @@ export class ProxyHostsRenderApplyService {
   private readonly dataDir: string;
   private readonly certsDirInContainer = '/etc/haproxy/certs';
   private readonly haproxyContainer: string;
+  private readonly webPort: number;
+  private readonly apiPort: number;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly crypto: CryptoService,
     private readonly cfg: ConfigService,
+    private readonly geoLists: GeoListsService,
+    private readonly transports: TransportFactory,
   ) {
     this.dataDir = this.cfg.get<string>('HAPROXY_DATA_DIR') ?? '/haproxy-data';
     this.haproxyContainer = this.cfg.get<string>('HAPROXY_CONTAINER_NAME') ?? 'haproxy-balancer';
+    this.webPort = Number(this.cfg.get<string>('WEB_PORT') ?? 8080);
+    this.apiPort = Number(this.cfg.get<string>('PORT') ?? 3000);
   }
 
   /**
@@ -95,8 +115,21 @@ export class ProxyHostsRenderApplyService {
     certsLoaded: number;
     reloadOk: boolean;
     reloadError?: string;
+    nodes: NodeDeployResult[];
   }> {
     // 1) Запросить данные
+    const cluster = await this.prisma.cluster.findUnique({
+      where: { id: clusterId },
+      select: { logFormat: true, nodes: true },
+    });
+
+    // Ноды кластера определяют, КУДА едет конфиг. Локальный haproxy трогаем
+    // только если у ЭТОГО кластера есть LOCAL-нода — иначе кластеры
+    // перезаписывали бы один общий /haproxy-data/haproxy.cfg.
+    const clusterNodes = cluster?.nodes ?? [];
+    const localNode = clusterNodes.find((n) => n.transport === 'LOCAL') ?? null;
+    const sshNodes = clusterNodes.filter((n) => n.transport === 'SSH');
+    const useLocal = localNode !== null;
     const rawHosts = await this.prisma.proxyHost.findMany({
       where: { clusterId, enabled: true },
       orderBy: { createdAt: 'asc' },
@@ -123,11 +156,9 @@ export class ProxyHostsRenderApplyService {
       ssl: h.ssl,
       certificateId: h.certificateId,
       httpToHttps: h.httpToHttps,
-      hsts: h.hsts,
       blockExploits: h.blockExploits,
       wsSupport: h.wsSupport,
       http2: h.http2,
-      http3: h.http3,
       enabled: h.enabled,
       accessGroupIds: h.accessGroupMemberships.map((m) => m.accessGroupId),
       customHeaders: parseCustomHeadersJson(h.customHeaders),
@@ -151,65 +182,191 @@ export class ProxyHostsRenderApplyService {
       groupsById.set(row.id, this.resolveAccessGroupRow(row));
     }
 
-    // 2) Развернуть сертификаты на диск
+    // 2) Сертификаты: расшифровываем в память; на локальный диск пишем
+    // только если у кластера есть LOCAL-нода (иначе затёрли бы certs
+    // другого кластера).
     const certsDir = path.join(this.dataDir, 'certs');
-    await fs.mkdir(certsDir, { recursive: true });
-    // Чистим старые .pem (кроме placeholder'а если он есть)
-    try {
-      const existing = await fs.readdir(certsDir);
-      for (const f of existing) {
-        if (f.endsWith('.pem')) await fs.unlink(path.join(certsDir, f)).catch(() => {});
-      }
-    } catch {
-      /* пусто */
-    }
-
     const certFileById = new Map<string, string>(); // certId → filename
+    const certFiles = new Map<string, string>(); // filename → pem
     for (const c of certs) {
       try {
         const pem = this.crypto.decryptToString(Buffer.from(c.encryptedPemBlob));
         const safe = c.commonName.replace(/[^a-z0-9.-]/gi, '_');
         const fname = `${safe}_${c.id.slice(-8)}.pem`;
-        await fs.writeFile(path.join(certsDir, fname), pem, { mode: 0o600 });
         certFileById.set(c.id, fname);
+        certFiles.set(fname, pem);
       } catch (err) {
-        this.logger.error(`Failed to write cert ${c.id} (${c.commonName})`, err as Error);
+        this.logger.error(`Failed to decrypt cert ${c.id} (${c.commonName})`, err as Error);
         throw new AppException(
           ErrorCode.INTERNAL,
-          `Failed to write certificate ${c.commonName} to disk`,
+          `Failed to decrypt certificate ${c.commonName}`,
           500,
         );
       }
     }
 
-    // 2.5) Custom error pages (defaults или переопределения из БД по clusterId)
-    await this.writeErrorFiles(clusterId);
-    await this.writeAccessGroupFiles(groupsById);
-
-    const hasCerts = certFileById.size > 0;
-
-    // 3) Сгенерировать haproxy.cfg
-    const cfg = this.renderCfg(hosts, hasCerts, groupsById);
-    const cfgPath = path.join(this.dataDir, 'haproxy.cfg');
-    try {
-      await fs.writeFile(cfgPath, cfg, { mode: 0o644 });
-    } catch (err) {
-      this.logger.error('Failed to write haproxy.cfg', err as Error);
-      throw new AppException(ErrorCode.INTERNAL, 'Failed to write haproxy.cfg', 500);
+    let hasPanelCert = false;
+    if (useLocal) {
+      await fs.mkdir(certsDir, { recursive: true });
+      // Чистим старые .pem. _default.pem не трогаем — это self-signed серт
+      // панели (fe_panel на WEB_PORT), его создаёт install.sh.
+      try {
+        const existing = await fs.readdir(certsDir);
+        for (const f of existing) {
+          if (f.endsWith('.pem') && f !== '_default.pem')
+            await fs.unlink(path.join(certsDir, f)).catch(() => {});
+        }
+      } catch {
+        /* пусто */
+      }
+      for (const [fname, pem] of certFiles) {
+        await fs.writeFile(path.join(certsDir, fname), pem, { mode: 0o600 });
+      }
+      hasPanelCert = await fs.access(path.join(certsDir, '_default.pem')).then(
+        () => true,
+        () => false,
+      );
     }
 
-    // 4) Перезапустить haproxy (graceful reload через SIGUSR2)
+    // 2.5) Custom error pages и acl-файлы групп: локальная директория служит
+    // и кэшем для SSH-деплоя, и рабочими файлами LOCAL-ноды.
+    const errorFiles = await this.writeErrorFiles(clusterId);
+    const aclFiles = await this.writeAccessGroupFiles(groupsById);
+    // Гео-списки: скачиваем/обновляем geo_<cc>.lst для всех стран из групп
+    const neededGeo = Array.from(new Set([...groupsById.values()].flatMap((g) => g.geoCodes)));
+    await this.geoLists.ensure(neededGeo);
+
+    const hasCerts = certFileById.size > 0;
+    const nodeResults: NodeDeployResult[] = [];
+
+    // 3) Локальная нода: рендер с панелью + запись/валидация/reload как раньше.
     let reloadOk = true;
     let reloadError: string | undefined;
-    try {
-      await execAsync(`docker kill -s USR2 ${this.haproxyContainer}`, { timeout: 10_000 });
-      this.logger.log(
-        `Applied: ${hosts.length} hosts, ${certFileById.size} certs, ${hosts.filter((x) => x.ssl).length} ssl-bound`,
+    if (useLocal && localNode) {
+      const cfg = this.renderCfg(
+        hosts,
+        hasCerts,
+        groupsById,
+        hasPanelCert,
+        cluster?.logFormat ?? null,
+        true,
       );
-    } catch (err) {
+      const cfgPath = path.join(this.dataDir, 'haproxy.cfg');
+      // Прошлый конфиг — для отката, если новый не пройдёт haproxy -c.
+      const prevCfg = await fs.readFile(cfgPath, 'utf8').catch(() => null);
+      try {
+        // ВАЖНО: writeFile перезаписывает по тому же inode — single-file
+        // bind mount в haproxy контейнере видит новое содержимое.
+        await fs.writeFile(cfgPath, cfg, { mode: 0o644 });
+      } catch (err) {
+        this.logger.error('Failed to write haproxy.cfg', err as Error);
+        throw new AppException(ErrorCode.INTERNAL, 'Failed to write haproxy.cfg', 500);
+      }
+
+      // Валидация нового конфига ДО reload. Если конфиг битый — haproxy
+      // переживёт reload (останется на старом), но упадёт при рестарте
+      // контейнера. Поэтому битый конфиг откатываем сразу.
+      const check = await this.validateCfg();
+      if (!check.ok) {
+        if (prevCfg !== null) {
+          await fs
+            .writeFile(cfgPath, prevCfg, { mode: 0o644 })
+            .catch((err) =>
+              this.logger.error('Failed to restore previous haproxy.cfg', err as Error),
+            );
+        }
+        throw new AppException(
+          ErrorCode.VALIDATION_FAILED,
+          `Generated haproxy.cfg failed validation, previous config restored: ${check.output}`,
+          422,
+        );
+      }
+
+      // Перезапустить haproxy (graceful reload через SIGUSR2)
+      try {
+        await execAsync(`docker kill -s USR2 ${this.haproxyContainer}`, { timeout: 10_000 });
+        this.logger.log(
+          `Applied locally: ${hosts.length} hosts, ${certFileById.size} certs, ${hosts.filter((x) => x.ssl).length} ssl-bound`,
+        );
+      } catch (err) {
+        reloadOk = false;
+        reloadError = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`docker kill -s USR2 ${this.haproxyContainer} failed: ${reloadError}`);
+      }
+      nodeResults.push({
+        nodeId: localNode.id,
+        nodeName: localNode.name,
+        transport: 'LOCAL',
+        ok: reloadOk,
+        error: reloadError,
+      });
+    } else if (clusterNodes.length === 0) {
+      // Кластер без нод: ничего не деплоим (и не затираем чужой конфиг).
       reloadOk = false;
-      reloadError = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`docker kill -s USR2 ${this.haproxyContainer} failed: ${reloadError}`);
+      reloadError =
+        'Cluster has no nodes — config rendered nowhere. Add a node on the Clusters page.';
+      this.logger.warn(`apply(${clusterId}): ${reloadError}`);
+    } else {
+      reloadOk = true; // нет локальной ноды — локальный reload не нужен
+    }
+
+    // 4) SSH-ноды: один RenderedTree (без fe_panel — панель живёт только
+    // на машине с api), деплой/валидация/reload через SshTransport.
+    if (sshNodes.length > 0) {
+      const remoteCfg = this.renderCfg(
+        hosts,
+        hasCerts,
+        groupsById,
+        false,
+        cluster?.logFormat ?? null,
+        false,
+      );
+      const tree: RenderedTree = { files: new Map() };
+      tree.files.set('haproxy.cfg', remoteCfg);
+      for (const [fname, pem] of certFiles) tree.files.set(`certs/${fname}`, pem);
+      for (const [rel, content] of errorFiles) tree.files.set(rel, content);
+      for (const [rel, content] of aclFiles) tree.files.set(rel, content);
+      for (const cc of neededGeo) {
+        const geoContent = await fs
+          .readFile(path.join(this.dataDir, 'acl', `geo_${cc}.lst`), 'utf8')
+          .catch(() => null);
+        if (geoContent !== null) tree.files.set(`acl/geo_${cc}.lst`, geoContent);
+      }
+
+      for (const node of sshNodes) {
+        const transport = await this.transports.forNode(node);
+        let ok = false;
+        let error: string | undefined;
+        try {
+          await transport.deploy(tree);
+          await transport.validate();
+          await transport.reload();
+          ok = true;
+        } catch (err) {
+          error = err instanceof Error ? err.message : String(err);
+          this.logger.warn(`ssh deploy to node ${node.name} failed: ${error}`);
+        } finally {
+          await transport.close();
+        }
+        await this.prisma.node
+          .update({
+            where: { id: node.id },
+            data: { status: ok ? 'ONLINE' : 'OFFLINE', ...(ok ? { lastSeenAt: new Date() } : {}) },
+          })
+          .catch(() => {});
+        nodeResults.push({
+          nodeId: node.id,
+          nodeName: node.name,
+          transport: 'SSH',
+          ok,
+          error,
+        });
+        if (!ok) reloadOk = false;
+      }
+    }
+
+    if (!reloadError) {
+      reloadError = nodeResults.find((r) => !r.ok)?.error;
     }
 
     return {
@@ -217,19 +374,50 @@ export class ProxyHostsRenderApplyService {
       certsLoaded: certFileById.size,
       reloadOk,
       reloadError,
+      nodes: nodeResults,
     };
   }
 
   /**
-   * Пишет HAProxy errorfile (*.http): дефолтный HPM HTML или кастом из ErrorFile.
+   * Прогоняет `haproxy -c` внутри работающего haproxy-контейнера на уже
+   * записанном (bind-mounted) haproxy.cfg + conf.d. Возвращает ok=false
+   * только если сам haproxy забраковал конфиг; если docker/контейнер
+   * недоступны — валидацию пропускаем (best-effort), о проблеме скажет
+   * последующий reload.
    */
-  private async writeErrorFiles(clusterId: string): Promise<void> {
-    const codes = [400, 403, 408, 500, 502, 503, 504];
+  private async validateCfg(): Promise<{ ok: boolean; output: string }> {
+    const cmd =
+      `docker exec ${this.haproxyContainer} haproxy -c ` +
+      '-f /usr/local/etc/haproxy/haproxy.cfg -f /usr/local/etc/haproxy/conf.d/';
+    try {
+      const { stdout, stderr } = await execAsync(cmd, { timeout: 15_000 });
+      return { ok: true, output: (stdout || stderr).trim() };
+    } catch (err) {
+      const e = err as { stderr?: string; stdout?: string; message?: string };
+      const output = (e.stderr || e.stdout || e.message || String(err)).trim();
+      // Ошибка docker'а (нет контейнера/демона) — не вина конфига.
+      if (
+        /error response from daemon|no such container|cannot connect to the docker/i.test(output)
+      ) {
+        this.logger.warn(`haproxy -c unavailable, skipping validation: ${output}`);
+        return { ok: true, output };
+      }
+      return { ok: false, output };
+    }
+  }
+
+  /**
+   * Пишет HAProxy errorfile (*.http): дефолтный HAFlux HTML или кастом из ErrorFile.
+   * Возвращает карту relPath → payload (для SSH-деплоя на удалённые ноды).
+   */
+  private async writeErrorFiles(clusterId: string): Promise<Map<string, string>> {
+    const codes = [400, 403, 404, 408, 500, 502, 503, 504];
     const customRows = await this.prisma.errorFile.findMany({
       where: { clusterId },
     });
     const byStatus = new Map<number, ErrorFile>(customRows.map((r) => [r.status, r]));
 
+    const out = new Map<string, string>();
     const errDir = path.join(this.dataDir, 'errors');
     await fs.mkdir(errDir, { recursive: true });
     for (const code of codes) {
@@ -241,7 +429,9 @@ export class ProxyHostsRenderApplyService {
         payload = this.buildHttpErrorFilePayload(code, this.renderErrorHtml(code));
       }
       await fs.writeFile(path.join(errDir, `${code}.http`), payload, { mode: 0o644 });
+      out.set(`errors/${code}.http`, payload);
     }
+    return out;
   }
 
   /** Полный тело errorfile для HAProxy из HTML-документа (без HTTP-заголовков сверху). */
@@ -251,7 +441,7 @@ export class ProxyHostsRenderApplyService {
     return head + htmlBody;
   }
 
-  /** Дефолтное HTML (как в шаблоне HPM), без слоя HTTP. */
+  /** Дефолтное HTML (как в шаблоне HAFlux), без слоя HTTP. */
   defaultErrorPageHtml(code: number): string {
     return this.renderErrorHtml(code);
   }
@@ -279,6 +469,7 @@ export class ProxyHostsRenderApplyService {
         {
           400: 'Malformed request — check headers, method or body.',
           403: 'Access denied by access list or authentication.',
+          404: 'No proxy host is configured for this domain.',
           408: 'Client took too long to send the request.',
           500: 'Upstream returned an internal error.',
           502: 'No upstream server available right now.',
@@ -309,16 +500,20 @@ p{margin:1rem 0 0;line-height:1.6;opacity:.8;font-size:14px}
 </style></head>
 <body class="scan">
 <div class="card">
-<div class="label">[ HPM · ${code} ]</div>
+<div class="label">[ HAFlux · ${code} ]</div>
 <h1>${text}</h1>
 <p>${explain}</p>
-<div class="meta"><span>HAProxy Packet Manager</span><span>code: ${code}</span></div>
+<div class="meta"><span>HAFlux</span><span>code: ${code}</span></div>
 </div>
 </body></html>`;
   }
 
   private resolveAccessGroupRow(row: AccessGroup): ResolvedAccessGroup {
     const ips = ((row.ipAllowlist as string[]) ?? []).map((x) => x.trim()).filter(Boolean);
+    const denies = ((row.ipDenylist as string[]) ?? []).map((x) => x.trim()).filter(Boolean);
+    const geoCodes = ((row.geoDenylist as string[]) ?? [])
+      .map((x) => x.trim().toLowerCase())
+      .filter((x) => /^[a-z]{2}$/.test(x));
     const rawUsers = (row.authUsers as { username: string; passwordEnc: string }[]) ?? [];
     const users = rawUsers.map((u) => ({
       username: u.username,
@@ -327,26 +522,48 @@ p{margin:1rem 0 0;line-height:1.6;opacity:.8;font-size:14px}
     return {
       id: row.id,
       hasIp: ips.length > 0,
+      hasDeny: denies.length > 0,
       hasAuth: users.length > 0,
       ipLines: ips,
+      denyLines: denies,
+      geoCodes,
       users,
     };
   }
 
-  private async writeAccessGroupFiles(groupsById: Map<string, ResolvedAccessGroup>): Promise<void> {
-    if (groupsById.size === 0) return;
+  /** Возвращает карту relPath → содержимое (для SSH-деплоя). */
+  private async writeAccessGroupFiles(
+    groupsById: Map<string, ResolvedAccessGroup>,
+  ): Promise<Map<string, string>> {
+    const out = new Map<string, string>();
+    if (groupsById.size === 0) return out;
     const aclDir = path.join(this.dataDir, 'acl');
     await fs.mkdir(aclDir, { recursive: true });
     for (const [id, g] of groupsById) {
-      if (!g.hasIp) continue;
-      await fs.writeFile(path.join(aclDir, `hpm_${id}.lst`), `${g.ipLines.join('\n')}\n`, {
-        mode: 0o644,
-      });
+      if (g.hasIp) {
+        const content = `${g.ipLines.join('\n')}\n`;
+        await fs.writeFile(path.join(aclDir, `haflux_${id}.lst`), content, { mode: 0o644 });
+        out.set(`acl/haflux_${id}.lst`, content);
+      }
+      if (g.hasDeny) {
+        const content = `${g.denyLines.join('\n')}\n`;
+        await fs.writeFile(path.join(aclDir, `haflux_deny_${id}.lst`), content, { mode: 0o644 });
+        out.set(`acl/haflux_deny_${id}.lst`, content);
+      }
     }
+    return out;
   }
 
   private aclSrcName(groupId: string): string {
-    return `hpmg_${groupId}_src`;
+    return `hafluxg_${groupId}_src`;
+  }
+
+  private aclSrcDenyName(groupId: string): string {
+    return `hafluxg_${groupId}_src_deny`;
+  }
+
+  private aclGeoName(cc: string): string {
+    return `geo_${cc}_src`;
   }
 
   private escapePwdForUserlist(p: string): string {
@@ -355,7 +572,7 @@ p{margin:1rem 0 0;line-height:1.6;opacity:.8;font-size:14px}
   }
 
   private hostMergedUlName(hostId: string): string {
-    return `hpm_ul_host_${hostId}`;
+    return `haflux_ul_host_${hostId}`;
   }
 
   /** Один userlist на хост: пользователи всех привязанных групп (дубликаты имён — первый выигрывает). */
@@ -396,6 +613,9 @@ p{margin:1rem 0 0;line-height:1.6;opacity:.8;font-size:14px}
     hosts: ProxyHostWithAccess[],
     hasCerts: boolean,
     groupsById: Map<string, ResolvedAccessGroup>,
+    hasPanelCert: boolean,
+    logFormat: string | null,
+    includePanel: boolean,
   ): string {
     const httpHosts = hosts.filter(
       (h) => h.forwardScheme === 'http' || h.forwardScheme === 'https',
@@ -429,6 +649,7 @@ global
   timeout server  60s
   errorfile 400 /etc/haproxy/errors/400.http
   errorfile 403 /etc/haproxy/errors/403.http
+  errorfile 404 /etc/haproxy/errors/404.http
   errorfile 408 /etc/haproxy/errors/408.http
   errorfile 500 /etc/haproxy/errors/500.http
   errorfile 502 /etc/haproxy/errors/502.http
@@ -436,11 +657,18 @@ global
   errorfile 504 /etc/haproxy/errors/504.http
 `);
 
+    // Кастомный log-format кластера — на frontend'ах (в defaults c
+    // req.fhdr(...) HAProxy 3.1 strict падает).
+    const logFormatLine = logFormat
+      ? `  log-format "${escapeHaproxyDoubleQuoted(logFormat)}"`
+      : null;
+
     // ── Frontend :80 ─────────────────────────────────────────
-    // log-format не переопределяем — option httplog в defaults даёт стандартный формат.
+    // Без кастомного формата — option httplog в defaults даёт стандартный.
     // capture user-agent делаем явно, чтобы не пропадало в логах.
     out.push('frontend fe_http');
     out.push('  bind *:80');
+    if (logFormatLine) out.push(logFormatLine);
     out.push('  capture request header User-Agent len 200');
     out.push('');
 
@@ -453,23 +681,51 @@ global
         out.push(`  acl host_${h.id} hdr(host) -i ${h.domain}`);
       }
     }
-    // Panel ACL для бэкенд-API (по path)
-    out.push('  acl is_api path_beg /api');
     out.push('');
 
     {
       const feHttpGroupIds = new Set<string>();
+      const feHttpDenyGroupIds = new Set<string>();
+      const feHttpGeoCodes = new Set<string>();
       for (const h of httpHosts) {
-        if (h.ssl && h.httpToHttps) continue;
         for (const gid of h.accessGroupIds) {
           const g = groupsById.get(gid);
+          // denylist/гео действуют всегда, даже на хостах с редиректом на HTTPS
+          if (g?.hasDeny) feHttpDenyGroupIds.add(gid);
+          for (const cc of g?.geoCodes ?? []) feHttpGeoCodes.add(cc);
+          if (h.ssl && h.httpToHttps) continue;
           if (g?.hasIp) feHttpGroupIds.add(gid);
         }
       }
-      for (const gid of feHttpGroupIds) {
-        out.push(`  acl ${this.aclSrcName(gid)} src -f /etc/haproxy/acl/hpm_${gid}.lst`);
+      for (const gid of feHttpDenyGroupIds) {
+        out.push(
+          `  acl ${this.aclSrcDenyName(gid)} src -f /etc/haproxy/acl/haflux_deny_${gid}.lst`,
+        );
       }
-      if (feHttpGroupIds.size > 0) out.push('');
+      for (const cc of feHttpGeoCodes) {
+        out.push(`  acl ${this.aclGeoName(cc)} src -f /etc/haproxy/acl/geo_${cc}.lst`);
+      }
+      for (const gid of feHttpGroupIds) {
+        out.push(`  acl ${this.aclSrcName(gid)} src -f /etc/haproxy/acl/haflux_${gid}.lst`);
+      }
+      if (feHttpGroupIds.size > 0 || feHttpDenyGroupIds.size > 0 || feHttpGeoCodes.size > 0)
+        out.push('');
+    }
+
+    // 0) IP/гео denylist: блокируем раньше всего остального (включая redirect).
+    for (const h of httpHosts) {
+      for (const gid of h.accessGroupIds) {
+        const g = groupsById.get(gid);
+        if (!g) continue;
+        if (g.hasDeny) {
+          out.push(
+            `  http-request deny deny_status 403 if host_${h.id} ${this.aclSrcDenyName(gid)}`,
+          );
+        }
+        for (const cc of g.geoCodes) {
+          out.push(`  http-request deny deny_status 403 if host_${h.id} ${this.aclGeoName(cc)}`);
+        }
+      }
     }
 
     // 1) blockExploits — http-request rules ВСЕГДА должны быть до redirect/use_backend,
@@ -506,7 +762,7 @@ global
         const ulName = this.hostMergedUlName(h.id);
         const ackName = `auth_ok_${h.id}`;
         out.push(`  acl ${ackName} http_auth(${ulName})`);
-        out.push(`  http-request auth realm "HPM" if host_${h.id} !${ackName}`);
+        out.push(`  http-request auth realm "HAFlux" if host_${h.id} !${ackName}`);
       }
     }
 
@@ -516,8 +772,10 @@ global
       out.push(`  use_backend be_proxy_${h.id} if host_${h.id}`);
     }
 
-    // 4) Панель (api сам отдаёт SPA + REST через @fastify/static)
-    out.push('  default_backend be_panel');
+    // 4) Неизвестный домен → 404. Панель на :80 НЕ выставляем: она живёт
+    // только на своём порту (fe_panel ниже), чтобы приземлённый на сервер
+    // домен не показывал панель.
+    out.push('  default_backend be_no_match');
     out.push('');
 
     // ── Frontend :443 (только если есть сертификаты) ────────
@@ -532,25 +790,13 @@ global
     if (hasCerts) {
       const httpsHosts = httpHosts;
       const anyH2 = httpsHosts.some((h) => h.http2);
-      const anyH3 = httpsHosts.some((h) => h.http3);
-      const alpnList = anyH3 ? 'h3,h2,http/1.1' : anyH2 ? 'h2,http/1.1' : 'http/1.1';
+      const alpnList = anyH2 ? 'h2,http/1.1' : 'http/1.1';
 
       out.push('frontend fe_https');
       out.push(`  bind *:443 ssl crt ${this.certsDirInContainer}/ alpn ${alpnList}`);
+      if (logFormatLine) out.push(logFormatLine);
       out.push('  capture request header User-Agent len 200');
-      if (anyH3) {
-        // QUIC требует UDP-сокет на :443
-        out.push(
-          `  bind quic4@*:443 ssl crt ${this.certsDirInContainer}/ alpn h3 quic-cc-algo cubic`,
-        );
-      }
       out.push('  http-request set-header X-Forwarded-Proto https');
-      // Alt-Svc: рекламируем h3 для следующих запросов
-      if (anyH3) {
-        out.push(
-          '  http-response set-header Alt-Svc "h3=\\":443\\"; ma=86400, h3-29=\\":443\\"; ma=86400"',
-        );
-      }
       out.push('');
 
       for (const h of httpsHosts) {
@@ -564,26 +810,47 @@ global
 
       {
         const feHttpsGroupIds = new Set<string>();
+        const feHttpsDenyGroupIds = new Set<string>();
+        const feHttpsGeoCodes = new Set<string>();
         for (const h of httpsHosts) {
           for (const gid of h.accessGroupIds) {
             const g = groupsById.get(gid);
             if (g?.hasIp) feHttpsGroupIds.add(gid);
+            if (g?.hasDeny) feHttpsDenyGroupIds.add(gid);
+            for (const cc of g?.geoCodes ?? []) feHttpsGeoCodes.add(cc);
           }
         }
-        for (const gid of feHttpsGroupIds) {
-          out.push(`  acl ${this.aclSrcName(gid)} src -f /etc/haproxy/acl/hpm_${gid}.lst`);
-        }
-        if (feHttpsGroupIds.size > 0) out.push('');
-      }
-
-      // HSTS
-      for (const h of httpsHosts) {
-        if (h.hsts) {
+        for (const gid of feHttpsDenyGroupIds) {
           out.push(
-            `  http-response set-header Strict-Transport-Security "max-age=31536000; includeSubDomains" if host_${h.id}`,
+            `  acl ${this.aclSrcDenyName(gid)} src -f /etc/haproxy/acl/haflux_deny_${gid}.lst`,
           );
         }
+        for (const cc of feHttpsGeoCodes) {
+          out.push(`  acl ${this.aclGeoName(cc)} src -f /etc/haproxy/acl/geo_${cc}.lst`);
+        }
+        for (const gid of feHttpsGroupIds) {
+          out.push(`  acl ${this.aclSrcName(gid)} src -f /etc/haproxy/acl/haflux_${gid}.lst`);
+        }
+        if (feHttpsGroupIds.size > 0 || feHttpsDenyGroupIds.size > 0 || feHttpsGeoCodes.size > 0)
+          out.push('');
       }
+
+      // IP/гео denylist: проверяется раньше allowlist/auth.
+      for (const h of httpsHosts) {
+        for (const gid of h.accessGroupIds) {
+          const g = groupsById.get(gid);
+          if (!g) continue;
+          if (g.hasDeny) {
+            out.push(
+              `  http-request deny deny_status 403 if host_${h.id} ${this.aclSrcDenyName(gid)}`,
+            );
+          }
+          for (const cc of g.geoCodes) {
+            out.push(`  http-request deny deny_status 403 if host_${h.id} ${this.aclGeoName(cc)}`);
+          }
+        }
+      }
+
       // blockExploits also on https
       for (const h of httpsHosts) {
         if (h.blockExploits) {
@@ -606,7 +873,7 @@ global
           const ulName = this.hostMergedUlName(h.id);
           const ackName = `auth_ok_${h.id}`;
           out.push(`  acl ${ackName} http_auth(${ulName})`);
-          out.push(`  http-request auth realm "HPM" if host_${h.id} !${ackName}`);
+          out.push(`  http-request auth realm "HAFlux" if host_${h.id} !${ackName}`);
         }
       }
 
@@ -620,6 +887,25 @@ global
       for (const h of httpsHosts) {
         out.push(`  use_backend be_proxy_${h.id} if host_${h.id}`);
       }
+      // SNI есть, но ни один хост не совпал → 404 (не панель!)
+      out.push('  default_backend be_no_match');
+      out.push('');
+    }
+
+    // ── Frontend панели: ТОЛЬКО кастомный порт ───────────────
+    // Self-signed _default.pem кладёт install.sh; если его нет (например,
+    // dev-окружение без инсталлера) — слушаем plain http.
+    // На удалённых (SSH) нодах панель не рендерим: api живёт не там.
+    if (includePanel) {
+      out.push('frontend fe_panel');
+      if (hasPanelCert) {
+        out.push(
+          `  bind *:${this.webPort} ssl crt ${this.certsDirInContainer}/_default.pem alpn h2,http/1.1`,
+        );
+      } else {
+        out.push(`  bind *:${this.webPort}`);
+      }
+      out.push('  default_backend be_panel');
       out.push('');
     }
 
@@ -651,8 +937,15 @@ global
     // ── Backends ─────────────────────────────────────────────
     // Панель: api контейнер сам раздаёт и SPA (статика через
     // @fastify/static) и REST. nginx больше нет.
-    out.push(`backend be_panel
-  server api 127.0.0.1:3000 check
+    if (includePanel) {
+      out.push(`backend be_panel
+  server api 127.0.0.1:${this.apiPort} check
+`);
+    }
+
+    // Домены, не привязанные ни к одному proxy host → 404
+    out.push(`backend be_no_match
+  http-request deny deny_status 404
 `);
 
     for (const h of httpHosts) {

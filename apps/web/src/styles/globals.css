@@ -251,7 +251,7 @@ a.cyber-card:hover,
 }
 
 /* Основная колонка — плавный скролл якорей */
-.hpm-content {
+.haflux-content {
   scroll-behavior: smooth;
 }
 
@@ -318,7 +318,7 @@ textarea {
 /* ─── Mobile responsive ──────────────────────────────────────────── */
 
 @media (max-width: 768px) {
-  .hpm-mobile-drawer .hpm-sidebar {
+  .haflux-mobile-drawer .haflux-sidebar {
     position: relative !important;
     top: auto;
     left: auto;
@@ -334,10 +334,10 @@ textarea {
     border-right: 1px solid var(--color-separator) !important;
   }
   /* Sidebar превращается в верхний бар */
-  .hpm-shell {
+  .haflux-shell {
     grid-template-columns: 1fr !important;
   }
-  .hpm-sidebar {
+  .haflux-sidebar {
     position: fixed !important;
     top: 0;
     left: 0;
@@ -351,7 +351,7 @@ textarea {
     flex-direction: row !important;
     flex-wrap: wrap;
   }
-  .hpm-content {
+  .haflux-content {
     padding-top: 1rem;
   }
   .cyber-card {
@@ -387,7 +387,7 @@ textarea {
 
 /* ─── Modal overlay / panel (компонент Modal) ──────────────────────── */
 
-@keyframes hpm-modal-backdrop-in {
+@keyframes haflux-modal-backdrop-in {
   from {
     opacity: 0;
   }
@@ -396,7 +396,7 @@ textarea {
   }
 }
 
-@keyframes hpm-modal-panel-in {
+@keyframes haflux-modal-panel-in {
   from {
     opacity: 0;
     transform: translateY(10px) scale(0.985);
@@ -407,19 +407,19 @@ textarea {
   }
 }
 
-.hpm-modal-backdrop {
-  animation: hpm-modal-backdrop-in var(--motion-normal) var(--motion-ease-out) forwards;
+.haflux-modal-backdrop {
+  animation: haflux-modal-backdrop-in var(--motion-normal) var(--motion-ease-out) forwards;
 }
 
-.hpm-modal-panel {
-  animation: hpm-modal-panel-in var(--motion-slow) var(--motion-ease-out) forwards;
+.haflux-modal-panel {
+  animation: haflux-modal-panel-in var(--motion-slow) var(--motion-ease-out) forwards;
 }
 
 /* ─── Уважение к системным настройкам доступности ─────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
   html,
-  .hpm-content {
+  .haflux-content {
     scroll-behavior: auto;
   }
 
@@ -431,8 +431,8 @@ textarea {
     transform: none;
   }
 
-  .hpm-modal-backdrop,
-  .hpm-modal-panel {
+  .haflux-modal-backdrop,
+  .haflux-modal-panel {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
@@ -483,7 +483,7 @@ textarea {
 /* ─── Select / ListBox popover (cyber-themed) ─────────────────────────── */
 
 .cyber-popover,
-.hpm-listbox {
+.haflux-listbox {
   background: var(--color-bg);
   border: 1px solid var(--color-separator);
   border-radius: 2px;
@@ -519,7 +519,11 @@ textarea {
   padding: 6px 10px;
   border-radius: 2px;
   cursor: pointer;
-  color: var(--color-fg);
+  /* HeroUI вешает на item собственные полупрозрачные bg-* утилиты —
+     они ложатся слоем поверх наших сплошных цветов и «смешиваются».
+     Гасим их жёстко. */
+  background: transparent !important;
+  color: var(--color-fg) !important;
   outline: none;
   user-select: none;
   transition: background-color 120ms ease, color 120ms ease;
@@ -530,14 +534,20 @@ textarea {
 .cyber-popover [data-hover="true"],
 .cyber-popover [data-focused="true"],
 .cyber-popover [data-focus-visible="true"] {
-  background: var(--color-fg);
-  color: var(--color-bg);
+  background: var(--color-fg) !important;
+  color: var(--color-bg) !important;
 }
 
 .cyber-popover [data-selected="true"],
 .cyber-popover [aria-selected="true"] {
-  background: var(--color-fg);
-  color: var(--color-bg);
+  background: var(--color-fg) !important;
+  color: var(--color-bg) !important;
+}
+
+/* Вложенные элементы item'а (текст, чекмарк) не должны перекрашивать фон */
+.cyber-popover :is([role="option"], li) * {
+  background: transparent !important;
+  color: inherit !important;
 }
 
 .cyber-popover [data-disabled="true"],

@@ -2,11 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ClusterNodesModal } from '@/components/cluster-nodes-modal';
 import { Help } from '@/components/help';
 import { Modal } from '@/components/modal';
 import { PageHeader } from '@/components/page-header';
 import { PanelLoader } from '@/components/panel-loader';
-import { ApiError, api } from '@/lib/api';
+import { type ApplyResult, ApiError, api } from '@/lib/api';
 
 type ClusterMode = 'STANDALONE' | 'ACTIVE_PASSIVE' | 'ACTIVE_ACTIVE';
 const MODE_VALUES: ClusterMode[] = ['STANDALONE', 'ACTIVE_PASSIVE', 'ACTIVE_ACTIVE'];
@@ -24,8 +25,30 @@ export default function ClustersPage() {
     id: string;
     name: string;
     mode: ClusterMode;
+    logFormat: string | null;
   } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
+  const [nodesTarget, setNodesTarget] = useState<{ id: string; name: string } | null>(null);
+  const [applyResult, setApplyResult] = useState<{ clusterName: string; res: ApplyResult } | null>(
+    null,
+  );
+
+  const apply = useMutation({
+    mutationFn: (c: { id: string; name: string }) =>
+      api.clusters.apply(c.id).then((res) => ({ clusterName: c.name, res })),
+    onSuccess: (data) => setApplyResult(data),
+    onError: (err, c) =>
+      setApplyResult({
+        clusterName: c.name,
+        res: {
+          hostsApplied: 0,
+          certsLoaded: 0,
+          reloadOk: false,
+          reloadError: err instanceof ApiError ? err.message : String(err),
+          nodes: [],
+        },
+      }),
+  });
 
   const remove = useMutation({
     mutationFn: (id: string) => api.clusters.delete(id),
@@ -110,11 +133,27 @@ export default function ClustersPage() {
                   <button
                     type="button"
                     className="cyber-btn cyber-btn-ghost"
+                    onClick={() => setNodesTarget({ id: cluster.id, name: cluster.name })}
+                  >
+                    {t('clusters.nodesBtn')}
+                  </button>
+                  <button
+                    type="button"
+                    className="cyber-btn cyber-btn-ghost"
+                    disabled={apply.isPending}
+                    onClick={() => apply.mutate({ id: cluster.id, name: cluster.name })}
+                  >
+                    {apply.isPending ? t('actions.applying') : t('actions.apply')}
+                  </button>
+                  <button
+                    type="button"
+                    className="cyber-btn cyber-btn-ghost"
                     onClick={() =>
                       setEditTarget({
                         id: cluster.id,
                         name: cluster.name,
                         mode: cluster.mode as ClusterMode,
+                        logFormat: cluster.logFormat ?? null,
                       })
                     }
                   >
@@ -185,6 +224,67 @@ export default function ClustersPage() {
           <p className="cyber-mono text-sm">
             ! {remove.error instanceof ApiError ? remove.error.message : 'Failed'}
           </p>
+        )}
+      </Modal>
+
+      {nodesTarget && (
+        <ClusterNodesModal
+          clusterId={nodesTarget.id}
+          clusterName={nodesTarget.name}
+          open
+          onClose={() => setNodesTarget(null)}
+        />
+      )}
+
+      <Modal
+        open={!!applyResult}
+        onClose={() => setApplyResult(null)}
+        title={applyResult ? t('clusters.applyResultTitle', { name: applyResult.clusterName }) : ''}
+        description={t('clusters.applyResultDesc')}
+        size="sm"
+        footer={
+          <button type="button" className="cyber-btn" onClick={() => setApplyResult(null)}>
+            {t('actions.close')}
+          </button>
+        }
+      >
+        {applyResult && (
+          <div className="cyber-mono flex flex-col gap-2 text-sm">
+            <span>
+              {applyResult.res.reloadOk
+                ? t('clusters.applyOk')
+                : t('clusters.applyFailed', {
+                    error: applyResult.res.reloadError ?? 'unknown error',
+                  })}
+            </span>
+            <span style={{ color: 'var(--color-muted)' }}>
+              {t('clusters.applyHosts', { count: applyResult.res.hostsApplied })}
+            </span>
+            <span style={{ color: 'var(--color-muted)' }}>
+              {t('clusters.applyCerts', { count: applyResult.res.certsLoaded })}
+            </span>
+            {applyResult.res.nodes.length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                <span className="cyber-label">{t('clusters.applyNodesLabel')}</span>
+                {applyResult.res.nodes.map((n) => (
+                  <div
+                    key={n.nodeId}
+                    className="flex flex-wrap items-center gap-2 rounded-sm border px-3 py-2"
+                    style={{ borderColor: 'var(--color-separator)' }}
+                  >
+                    <span>{n.ok ? '✓' : '✗'}</span>
+                    <span>{n.nodeName}</span>
+                    <span className="cyber-tag">{n.transport}</span>
+                    {n.error && (
+                      <span className="break-all text-xs" style={{ color: 'var(--color-muted)' }}>
+                        {n.error}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </Modal>
     </div>
@@ -342,32 +442,42 @@ function EditClusterModal({
   onClose,
   onSaved,
 }: {
-  target: { id: string; name: string; mode: ClusterMode } | null;
+  target: { id: string; name: string; mode: ClusterMode; logFormat: string | null } | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const { t } = useTranslation();
   const [name, setName] = useState('');
   const [mode, setMode] = useState<ClusterMode>('STANDALONE');
+  const [logFormat, setLogFormat] = useState('');
   const [touched, setTouched] = useState(false);
 
   useEffect(() => {
     if (target) {
       setName(target.name);
       setMode(target.mode);
+      setLogFormat(target.logFormat ?? '');
       setTouched(false);
     }
   }, [target?.id]);
 
   const nameError = validateClusterName(name);
   const showError = touched && nameError !== null;
-  const dirty = !!target && (name.trim() !== target.name || mode !== target.mode);
+  const dirty =
+    !!target &&
+    (name.trim() !== target.name ||
+      mode !== target.mode ||
+      (logFormat.trim() || null) !== (target.logFormat ?? null));
   const canSubmit = nameError === null && dirty;
 
   const save = useMutation({
     mutationFn: () => {
       if (!target) throw new Error('no target');
-      return api.clusters.update(target.id, { name: name.trim(), mode });
+      return api.clusters.update(target.id, {
+        name: name.trim(),
+        mode,
+        logFormat: logFormat.trim() || null,
+      });
     },
     onSuccess: () => {
       setName('');
@@ -482,6 +592,20 @@ function EditClusterModal({
             ))}
           </div>
         </div>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="cyber-label">{t('clusters.logFormatLabel')}</span>
+          <input
+            className="cyber-input font-mono text-xs"
+            spellCheck={false}
+            value={logFormat}
+            onChange={(e) => setLogFormat(e.target.value)}
+            placeholder={t('clusters.logFormatPlaceholder')}
+          />
+          <span className="cyber-mono text-xs" style={{ color: 'var(--color-muted)' }}>
+            {t('clusters.logFormatHint')}
+          </span>
+        </label>
 
         {save.isError && (
           <p className="cyber-mono text-sm">

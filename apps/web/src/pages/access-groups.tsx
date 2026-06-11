@@ -6,6 +6,7 @@ import { Modal } from '@/components/modal';
 import { PageHeader } from '@/components/page-header';
 import { PanelLoader } from '@/components/panel-loader';
 import { type AccessGroupSummary, ApiError, api } from '@/lib/api';
+import { COUNTRY_CODES, countryName } from '@/lib/countries';
 
 function ClusterTabs({
   clusters,
@@ -151,6 +152,8 @@ export default function AccessGroupsPage() {
                 <span className="cyber-mono text-xs" style={{ color: 'var(--color-muted)' }}>
                   {t('accessGroups.metaLine', {
                     ips: g.ipCount,
+                    denies: g.denyCount,
+                    geo: g.geoCount,
                     users: g.userCount,
                     hosts: g.proxyHostCount,
                   })}
@@ -267,6 +270,9 @@ function AccessGroupFormModal({
 
   const [name, setName] = useState('');
   const [ipText, setIpText] = useState('');
+  const [denyText, setDenyText] = useState('');
+  const [geoCodes, setGeoCodes] = useState<string[]>([]);
+  const [geoSearch, setGeoSearch] = useState('');
   const [authRows, setAuthRows] = useState<AuthRow[]>([{ username: '', password: '' }]);
 
   useEffect(() => {
@@ -274,6 +280,9 @@ function AccessGroupFormModal({
     if (mode === 'create') {
       setName('');
       setIpText('');
+      setDenyText('');
+      setGeoCodes([]);
+      setGeoSearch('');
       setAuthRows([{ username: '', password: '' }]);
       return;
     }
@@ -281,6 +290,9 @@ function AccessGroupFormModal({
     if (!d) return;
     setName(d.name);
     setIpText(d.ipAllowlist.join('\n'));
+    setDenyText(d.ipDenylist.join('\n'));
+    setGeoCodes(d.geoDenylist);
+    setGeoSearch('');
     setAuthRows(
       d.users.length > 0
         ? d.users.map((u) => ({ username: u.username, password: '' }))
@@ -288,18 +300,22 @@ function AccessGroupFormModal({
     );
   }, [open, mode, detailQ.data]);
 
+  const linesOf = (text: string) =>
+    text
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+
   const create = useMutation({
     mutationFn: () => {
-      const ipAllowlist = ipText
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean);
       const users = authRows
         .filter((r) => r.username.trim() && r.password)
         .map((r) => ({ username: r.username.trim(), password: r.password }));
       return api.clusters.accessGroups.create(clusterId, {
         name: name.trim(),
-        ipAllowlist,
+        ipAllowlist: linesOf(ipText),
+        ipDenylist: linesOf(denyText),
+        geoDenylist: geoCodes,
         users,
       });
     },
@@ -309,10 +325,6 @@ function AccessGroupFormModal({
   const update = useMutation({
     mutationFn: () => {
       if (!groupId) throw new Error('groupId');
-      const ipAllowlist = ipText
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean);
       const users = authRows
         .filter((r) => r.username.trim())
         .map((r) => ({
@@ -321,7 +333,9 @@ function AccessGroupFormModal({
         }));
       return api.clusters.accessGroups.update(clusterId, groupId, {
         name: name.trim(),
-        ipAllowlist,
+        ipAllowlist: linesOf(ipText),
+        ipDenylist: linesOf(denyText),
+        geoDenylist: geoCodes,
         users,
       });
     },
@@ -330,11 +344,21 @@ function AccessGroupFormModal({
 
   const mutation = mode === 'edit' ? update : create;
   const hasIp = ipText.split('\n').some((l) => l.trim());
+  const hasDeny = denyText.split('\n').some((l) => l.trim());
   const hasUsers =
     mode === 'create'
       ? authRows.some((r) => r.username.trim() && r.password)
       : authRows.some((r) => r.username.trim());
-  const canSubmit = name.trim().length > 0 && (hasIp || hasUsers);
+  const canSubmit = name.trim().length > 0 && (hasIp || hasDeny || geoCodes.length > 0 || hasUsers);
+
+  const { i18n } = useTranslation();
+  const visibleCountries = COUNTRY_CODES.filter((cc) => {
+    const q = geoSearch.trim().toLowerCase();
+    if (!q) return true;
+    return cc.includes(q) || countryName(cc, i18n.language).toLowerCase().includes(q);
+  });
+  const toggleGeo = (cc: string) =>
+    setGeoCodes((prev) => (prev.includes(cc) ? prev.filter((x) => x !== cc) : [...prev, cc]));
 
   const loadingDetail = mode === 'edit' && detailQ.isLoading;
 
@@ -390,6 +414,62 @@ function AccessGroupFormModal({
               {t('accessGroups.ipHint')}
             </span>
           </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="cyber-label">{t('accessGroups.denyLabel')}</span>
+            <textarea
+              className="cyber-input min-h-[120px] resize-y font-mono text-xs"
+              spellCheck={false}
+              value={denyText}
+              onChange={(e) => setDenyText(e.target.value)}
+              placeholder={t('accessGroups.denyPlaceholder')}
+            />
+            <span className="cyber-mono text-xs" style={{ color: 'var(--color-muted)' }}>
+              {t('accessGroups.denyHint')}
+            </span>
+          </label>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="cyber-label">
+              {t('accessGroups.geoLabel')}
+              {geoCodes.length > 0 ? ` · ${geoCodes.length}` : ''}
+            </span>
+            <input
+              className="cyber-input font-mono text-xs"
+              placeholder={t('accessGroups.geoSearchPlaceholder')}
+              value={geoSearch}
+              onChange={(e) => setGeoSearch(e.target.value)}
+            />
+            <div
+              className="grid max-h-[180px] grid-cols-2 gap-x-3 gap-y-1 overflow-y-auto rounded-sm border p-2 md:grid-cols-3"
+              style={{ borderColor: 'var(--color-separator)' }}
+            >
+              {visibleCountries.map((cc) => (
+                <label key={cc} className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={geoCodes.includes(cc)}
+                    onChange={() => toggleGeo(cc)}
+                    style={{ accentColor: 'var(--color-fg)' }}
+                  />
+                  <span
+                    className="cyber-mono truncate text-xs"
+                    title={countryName(cc, i18n.language)}
+                  >
+                    {cc.toUpperCase()} · {countryName(cc, i18n.language)}
+                  </span>
+                </label>
+              ))}
+              {visibleCountries.length === 0 && (
+                <span className="cyber-mono text-xs" style={{ color: 'var(--color-muted)' }}>
+                  —
+                </span>
+              )}
+            </div>
+            <span className="cyber-mono text-xs" style={{ color: 'var(--color-muted)' }}>
+              {t('accessGroups.geoHint')}
+            </span>
+          </div>
 
           <div className="flex flex-col gap-2">
             <span className="cyber-label">{t('accessGroups.authLabel')}</span>

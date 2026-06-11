@@ -49,10 +49,14 @@ curl -fsSL https://raw.githubusercontent.com/HAFlux/HAFlux/main/install.sh | sud
 После установки:
 
 ```
-URL:      http://<your-host>:8080
+URL:      https://<your-host>:8080   (self-signed)
 Email:    admin@haflux.local
 Password: <напечатан в баннере>
 ```
+
+Панель слушает **только** свой порт (`HAFLUX_WEB_PORT`, по умолчанию `8080`).
+Порты 80/443 остаются свободными под proxy host'ы: домен, приземлённый на
+сервер, получает 404, а не панель.
 
 Управление стеком:
 
@@ -66,13 +70,13 @@ docker compose -f /opt/haflux/compose.yml --env-file /opt/haflux/.env [up|down|l
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/HAFlux/HAFlux/main/install.sh \
-  | sudo HAFLUX_API_TAG=v0.1.0 HAFLUX_WEB_PORT=80 bash
+  | sudo HAFLUX_API_TAG=v0.1.0 HAFLUX_WEB_PORT=9443 bash
 ```
 
 | Переменная | По умолчанию | Описание |
 |---|---|---|
 | `HAFLUX_INSTALL_DIR` | `/opt/haflux` | куда складывать compose.yml и секреты |
-| `HAFLUX_WEB_PORT` | `8080` | порт HAProxy с панелью наружу |
+| `HAFLUX_WEB_PORT` | `8080` | порт панели (https, self-signed); не ставь 80/443 — они под proxy host'ы |
 | `HAFLUX_API_PORT` | `3000` | порт api контейнера (на loopback) |
 | `HAFLUX_API_TAG` | `latest` | тег `ghcr.io/haflux/api` |
 | `HAFLUX_API_IMAGE` | вычисляется из тега | полный image override (для приватного registry) |

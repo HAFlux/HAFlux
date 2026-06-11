@@ -33,6 +33,13 @@ const CreateClusterSchema = z.object({
     }),
   mode: z.enum(['STANDALONE', 'ACTIVE_PASSIVE', 'ACTIVE_ACTIVE']).optional(),
   orgId: z.string().optional(),
+  /** Кастомный log-format (HAProxy syntax, одна строка). null = стандартный httplog. */
+  logFormat: z
+    .string()
+    .max(1024, 'log format is too long')
+    .regex(/^[^\r\n]*$/, { message: 'log format must be a single line' })
+    .nullable()
+    .optional(),
 });
 
 @ApiTags('clusters')

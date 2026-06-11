@@ -58,14 +58,14 @@ export function Modal({
       }}
     >
       <div
-        className="hpm-modal-backdrop absolute inset-0"
+        className="haflux-modal-backdrop absolute inset-0"
         style={{
           background: 'color-mix(in srgb, var(--color-bg) 70%, transparent)',
           backdropFilter: 'blur(4px)',
         }}
       />
       <div
-        className={`hpm-modal-panel relative cyber-card w-full ${SIZE_CLASS[size]} flex min-h-0 flex-col`}
+        className={`haflux-modal-panel relative cyber-card w-full ${SIZE_CLASS[size]} flex min-h-0 flex-col`}
         style={{ maxHeight: 'calc(100vh - 2rem)' }}
         onMouseDown={(e) => e.stopPropagation()}
       >

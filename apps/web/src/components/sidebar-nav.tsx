@@ -27,7 +27,7 @@ export const SidebarNav = ({ onNavigate }: { onNavigate?: () => void }) => {
 
   return (
     <aside
-      className="hpm-sidebar flex h-screen w-60 flex-col"
+      className="haflux-sidebar flex h-screen w-60 flex-col"
       style={{ borderRight: '1px solid var(--color-separator)' }}
     >
       <div className="flex items-center gap-2 px-5 py-4">

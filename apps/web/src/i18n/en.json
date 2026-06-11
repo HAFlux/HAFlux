@@ -1,5 +1,8 @@
 {
-  "app": { "name": "HPM", "tagline": "HAProxy Packet Manager" },
+  "app": {
+    "name": "HAFlux",
+    "tagline": "Multi-HAProxy control plane"
+  },
   "nav": {
     "dashboard": "Dashboard",
     "proxyHosts": "Proxy hosts",
@@ -47,7 +50,10 @@
     "verifying": "Verifying…",
     "renewing": "Renewing…",
     "issuing": "Issuing…",
-    "updating": "Updating…"
+    "updating": "Updating…",
+    "copy": "Copy",
+    "apply": "Apply",
+    "applying": "Applying…"
   },
   "login": {
     "title": "Sign in",
@@ -131,7 +137,18 @@
       "ACTIVE_PASSIVE": "Master + standby (Keepalived/VRRP)",
       "ACTIVE_ACTIVE": "All nodes serve traffic in parallel"
     },
-    "modeHelpSummary": "Topology for this logical cluster: one node, failover pair, or parallel active nodes."
+    "modeHelpSummary": "Topology for this logical cluster: one node, failover pair, or parallel active nodes.",
+    "logFormatLabel": "Custom log format",
+    "logFormatPlaceholder": "%ci:%cp [%tr] %ft %b/%s %ST %B %{+Q}r",
+    "logFormatHint": "HAProxy log-format for :80/:443 frontends. Empty = standard httplog. The config is validated (haproxy -c) before reload; an invalid format is rejected and rolled back.",
+    "nodesBtn": "Nodes",
+    "applyResultTitle": "Apply: {{name}}",
+    "applyResultDesc": "Render and deploy of the cluster configuration.",
+    "applyHosts": "Proxy hosts applied: {{count}}",
+    "applyCerts": "Certificates loaded: {{count}}",
+    "applyOk": "✓ Config deployed, HAProxy reloaded.",
+    "applyFailed": "✗ Apply failed: {{error}}",
+    "applyNodesLabel": "Nodes"
   },
   "certificates": {
     "title": "Certificates",
@@ -248,7 +265,6 @@
     "healthCheckPathPlaceholder": "/health or /api/ping",
     "healthCheckPathHint": "Leave empty for GET «/». Path only (not a full URL), no «..».",
     "helpHealthCheckPath": "Used by the Check button and the ~60s background probe. The request hits upstream with Host set to your public domain (like a browser). Does not change HAProxy routing.",
-    "helpHttp3": "HTTP/3 advertises QUIC (UDP) alongside TLS on TCP :443.",
     "helpCustomHeaders": "Applied as http-request set-header toward the upstream. Names are lowercased when saving.",
     "tagListen": "listen :{{port}}",
     "ssl": "// SSL / TLS",
@@ -265,12 +281,8 @@
     "accessGroupMustAssign": "Select the groups here and save the host — otherwise HAProxy will not add rules for this domain.",
     "forceHttps": "Force HTTP → HTTPS",
     "forceHttpsHint": "301 redirect from :80 to :443 for this domain.",
-    "hsts": "HSTS",
-    "hstsHint": "Strict-Transport-Security: max-age=31536000; includeSubDomains",
     "http2": "HTTP/2",
     "http2Hint": "Активировать ALPN h2,http/1.1 на bind :443. Безопасный апгрейд.",
-    "http3": "HTTP/3 (QUIC)",
-    "http3Hint": "Дополнительный bind quic4@:443 + Alt-Svc для рекламирования. UDP.",
     "wsSupport": "WebSocket support",
     "wsSupportHint": "Forward Upgrade/Connection headers + extended timeouts.",
     "blockExploits": "Block common exploits",
@@ -304,9 +316,7 @@
     "tagTls": "TLS",
     "tagCert": "cert: {{name}}",
     "tag443": "→ 443",
-    "tagHsts": "HSTS",
     "tagH2": "h2",
-    "tagH3": "h3",
     "tagWs": "ws",
     "tagBlockExploits": "block-exploits",
     "tagDisabled": "disabled",
@@ -326,7 +336,11 @@
       "domainInvalid": "must be a valid hostname (FQDN); wildcard *. allowed",
       "forwardRequired": "forward host is required",
       "forwardInvalid": "must be IP, hostname, or \"localhost\""
-    }
+    },
+    "probeButton": "Test upstream",
+    "probeChecking": "Testing…",
+    "probeReachable": "reachable",
+    "probeUnreachable": "unreachable"
   },
   "profile": {
     "title": "Profile",
@@ -363,7 +377,7 @@
     "badgeDefault": "default",
     "reset": "Reset to default",
     "resetting": "Restoring…",
-    "hintReload": "Uses HPM defaults until you save a custom page. Save applies config and sends SIGUSR2 to the HAProxy container.",
+    "hintReload": "Uses HAFlux defaults until you save a custom page. Save applies config and sends SIGUSR2 to the HAProxy container.",
     "saveSuccess": "✓ Saved and HAProxy reloaded.",
     "resetSuccess": "✓ Default restored and HAProxy reloaded.",
     "saveFailed": "Save failed",
@@ -374,18 +388,18 @@
     "kicker": "// IP + Basic Auth",
     "subtitle": "IP/Basic Auth rules reach HAProxy only when a group is attached to a specific proxy host (hostname). Creating a group alone does not block anything yet.",
     "calloutTitle": "Important",
-    "calloutBody": "A saved access group does nothing until you open Proxy hosts → your domain → Access control → select groups → Save.\n\nThe HPM UI is served through the panel backend without those ACLs by default. To restrict the panel URL itself, create a proxy host for that hostname (upstream = your API/panel), enable HTTPS, and attach the group.\n\nBehind Cloudflare or another proxy HAProxy sees the proxy IP, not the browser — adjust allowlists or rely on Basic Auth.",
+    "calloutBody": "A saved access group does nothing until you open Proxy hosts → your domain → Access control → select groups → Save.\n\nThe HAFlux UI is served through the panel backend without those ACLs by default. To restrict the panel URL itself, create a proxy host for that hostname (upstream = your API/panel), enable HTTPS, and attach the group.\n\nBehind Cloudflare or another proxy HAProxy sees the proxy IP, not the browser — adjust allowlists or rely on Basic Auth.",
     "newGroup": "+ New group",
     "noClusters": "No clusters yet",
     "noClustersHint": "Create a cluster under {{clusters}}, then define groups here.",
     "empty": "No access groups",
     "emptyHint": "Create a group with IP allowlist and/or users. Default behaviour stays open until you attach a group to a proxy host.",
-    "metaLine": "{{ips}} IPs · {{users}} users · {{hosts}} hosts",
+    "metaLine": "{{ips}} IPs · {{denies}} blocked · {{geo}} countries · {{users}} users · {{hosts}} hosts",
     "deleteTitle": "Delete access group",
     "deleteDesc": "{{name}} will be removed. Proxy hosts using it will become open (group detached).",
     "modalCreateTitle": "New access group",
     "modalEditTitle": "Edit access group",
-    "modalDesc": "Provide at least one allowed IP/CIDR line or one Basic Auth user with password.",
+    "modalDesc": "Provide at least one allowed or blocked IP/CIDR line, or one Basic Auth user with password.",
     "nameLabel": "Name",
     "namePlaceholder": "office-only",
     "ipLabel": "Allowed client IPs (one per line)",
@@ -396,7 +410,13 @@
     "authPass": "password",
     "authPassKeep": "new password (leave blank to keep)",
     "authHint": "Usernames: letters, digits, underscore. Combined with IP list: client must match IP and authenticate.",
-    "addUser": "+ Add user"
+    "addUser": "+ Add user",
+    "denyLabel": "Blocked client IPs (one per line)",
+    "denyPlaceholder": "198.51.100.7\n203.0.113.0/24",
+    "denyHint": "These IPs always get HTTP 403, checked before the allowlist and Basic Auth.",
+    "geoLabel": "Blocked countries (GeoIP)",
+    "geoSearchPlaceholder": "search country…",
+    "geoHint": "Requests from selected countries get HTTP 403. IP ranges are downloaded from ipdeny.com on apply and refreshed weekly."
   },
   "backup": {
     "kicker": "// Backup",
@@ -413,14 +433,14 @@
     "restoring": "Restoring...",
     "confirmTitle": "Confirm restore",
     "confirmBody": "All current data will be erased and replaced with the backup. This is irreversible.",
-    "invalidFile": "File is not a valid HPM backup.",
+    "invalidFile": "File is not a valid HAFlux backup.",
     "downloadOk": "Backup downloaded",
     "restoreOk": "Backup restored"
   },
   "help": {
     "kicker": "// Help",
-    "title": "About HPM",
-    "lead": "HPM (HAProxy Packet Manager) is a control plane for multiple HAProxy nodes: certificates, rendered configs, and proxy routing similar to Nginx Proxy Manager but for HAProxy only.",
+    "title": "About HAFlux",
+    "lead": "HAFlux is a control plane for multiple HAProxy nodes: certificates, rendered configs, and proxy routing similar to Nginx Proxy Manager but for HAProxy only.",
     "glossaryTitle": "Glossary",
     "terms": {
       "cluster": {
@@ -454,5 +474,26 @@
     "optional": "optional",
     "error": "Error: {{message}}",
     "failed": "Failed"
+  },
+  "nodes": {
+    "title": "Nodes — {{name}}",
+    "desc": "HAProxy nodes of this cluster. The config is rendered once and deployed to every node.",
+    "sshKeyLabel": "Panel SSH public key",
+    "sshKeyHint": "Add this key to ~/.ssh/authorized_keys of the SSH user on each remote node.",
+    "test": "Test",
+    "promote": "Promote",
+    "empty": "No nodes yet. Add a LOCAL node (this machine) or an SSH node.",
+    "add": "+ Add node",
+    "name": "Name",
+    "transport": "Transport",
+    "sshHost": "SSH host",
+    "sshPort": "SSH port",
+    "sshUser": "SSH user",
+    "dataDir": "HAProxy data dir",
+    "reloadMode": "Reload mode",
+    "reloadTarget": "Reload target",
+    "reloadTargetPlaceholder": "service / container / pid file / socket (default by mode)",
+    "role": "Role",
+    "layoutHint": "Auto-failover (ACTIVE_PASSIVE) only swaps PRIMARY/SECONDARY roles — traffic failover needs VIP/keepalived or DNS."
   }
 }

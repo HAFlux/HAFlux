@@ -108,6 +108,8 @@ model Cluster {
   orgId     String
   name      String
   mode      ClusterMode @default(STANDALONE)
+  /// Кастомный HAProxy log-format для fe_http/fe_https (null = стандартный httplog).
+  logFormat String?
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
@@ -675,14 +677,18 @@ enum HealthStatus {
   DEGRADED
 }
 
-/// Группа доступа: whitelist по IP (CIDR) и/или Basic Auth. Привязывается к ProxyHost.
-/// Пустой ipAllowlist и пустой authUsers недопустимы при сохранении (валидация в API).
+/// Группа доступа: whitelist/blacklist по IP (CIDR) и/или Basic Auth. Привязывается к ProxyHost.
+/// Группа должна содержать хотя бы что-то одно: allowlist, denylist или authUsers (валидация в API).
 model AccessGroup {
   id          String   @id @default(cuid())
   clusterId   String
   name        String
-  /// Список IPv4/IPv6 или CIDR (строки как в HAProxy `src`).
+  /// Список IPv4/IPv6 или CIDR (строки как в HAProxy `src`). Доступ ТОЛЬКО с этих адресов.
   ipAllowlist Json     @default("[]")
+  /// Список IPv4/IPv6 или CIDR. Этим адресам доступ ЗАПРЕЩЁН (403), проверяется раньше allowlist.
+  ipDenylist  Json     @default("[]")
+  /// Гео-блокировка: ISO 3166-1 alpha-2 коды стран (lowercase), которым доступ запрещён.
+  geoDenylist Json     @default("[]")
   /// [{ "username": string, "passwordEnc": base64 envelope }]
   authUsers   Json     @default("[]")
   createdAt   DateTime @default(now())
@@ -724,11 +730,9 @@ model ProxyHost {
   ssl           Boolean       @default(true)  // терминация TLS на :443
   certificateId String?
   httpToHttps   Boolean       @default(true)  // 80 → 301 → 443
-  hsts          Boolean       @default(false)
   blockExploits Boolean       @default(true)  // базовые WAF-правила
   wsSupport     Boolean       @default(true)  // Upgrade/Connection: keep-alive
   http2         Boolean       @default(true)  // alpn h2,http/1.1 (TLS only)
-  http3         Boolean       @default(false) // QUIC + bind quic4@*:443
   enabled       Boolean       @default(true)
   notes         String?
   /** Путь HTTP GET для проверки upstream (пинг в UI). Пусто = «/». */
