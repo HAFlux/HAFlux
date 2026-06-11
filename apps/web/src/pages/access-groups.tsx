@@ -6,7 +6,69 @@ import { Modal } from '@/components/modal';
 import { PageHeader } from '@/components/page-header';
 import { PanelLoader } from '@/components/panel-loader';
 import { type AccessGroupSummary, ApiError, api } from '@/lib/api';
-import { COUNTRY_CODES, countryName } from '@/lib/countries';
+import { COUNTRY_CODES, countryFlag, countryName } from '@/lib/countries';
+
+function GeoPicker({
+  label,
+  hint,
+  selected,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  selected: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const [search, setSearch] = useState('');
+  const visible = COUNTRY_CODES.filter((cc) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return cc.includes(q) || countryName(cc, i18n.language).toLowerCase().includes(q);
+  });
+  const toggle = (cc: string) =>
+    onChange(selected.includes(cc) ? selected.filter((x) => x !== cc) : [...selected, cc]);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="cyber-label">
+        {label}
+        {selected.length > 0 ? ` · ${selected.length}` : ''}
+      </span>
+      <input
+        className="cyber-input font-mono text-xs"
+        placeholder={t('accessGroups.geoSearchPlaceholder')}
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+      <div
+        className="grid max-h-[180px] grid-cols-2 gap-x-3 gap-y-1 overflow-y-auto rounded-sm border p-2 md:grid-cols-3"
+        style={{ borderColor: 'var(--color-separator)' }}
+      >
+        {visible.map((cc) => (
+          <label key={cc} className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={selected.includes(cc)}
+              onChange={() => toggle(cc)}
+              style={{ accentColor: 'var(--color-fg)' }}
+            />
+            <span className="cyber-mono truncate text-xs" title={countryName(cc, i18n.language)}>
+              {countryFlag(cc)} {cc.toUpperCase()} · {countryName(cc, i18n.language)}
+            </span>
+          </label>
+        ))}
+        {visible.length === 0 && (
+          <span className="cyber-mono text-xs" style={{ color: 'var(--color-muted)' }}>
+            —
+          </span>
+        )}
+      </div>
+      <span className="cyber-mono text-xs" style={{ color: 'var(--color-muted)' }}>
+        {hint}
+      </span>
+    </div>
+  );
+}
 
 function ClusterTabs({
   clusters,
@@ -272,7 +334,7 @@ function AccessGroupFormModal({
   const [ipText, setIpText] = useState('');
   const [denyText, setDenyText] = useState('');
   const [geoCodes, setGeoCodes] = useState<string[]>([]);
-  const [geoSearch, setGeoSearch] = useState('');
+  const [geoAllowCodes, setGeoAllowCodes] = useState<string[]>([]);
   const [authRows, setAuthRows] = useState<AuthRow[]>([{ username: '', password: '' }]);
 
   useEffect(() => {
@@ -282,7 +344,7 @@ function AccessGroupFormModal({
       setIpText('');
       setDenyText('');
       setGeoCodes([]);
-      setGeoSearch('');
+      setGeoAllowCodes([]);
       setAuthRows([{ username: '', password: '' }]);
       return;
     }
@@ -292,7 +354,7 @@ function AccessGroupFormModal({
     setIpText(d.ipAllowlist.join('\n'));
     setDenyText(d.ipDenylist.join('\n'));
     setGeoCodes(d.geoDenylist);
-    setGeoSearch('');
+    setGeoAllowCodes(d.geoAllowlist);
     setAuthRows(
       d.users.length > 0
         ? d.users.map((u) => ({ username: u.username, password: '' }))
@@ -316,6 +378,7 @@ function AccessGroupFormModal({
         ipAllowlist: linesOf(ipText),
         ipDenylist: linesOf(denyText),
         geoDenylist: geoCodes,
+        geoAllowlist: geoAllowCodes,
         users,
       });
     },
@@ -336,6 +399,7 @@ function AccessGroupFormModal({
         ipAllowlist: linesOf(ipText),
         ipDenylist: linesOf(denyText),
         geoDenylist: geoCodes,
+        geoAllowlist: geoAllowCodes,
         users,
       });
     },
@@ -349,16 +413,9 @@ function AccessGroupFormModal({
     mode === 'create'
       ? authRows.some((r) => r.username.trim() && r.password)
       : authRows.some((r) => r.username.trim());
-  const canSubmit = name.trim().length > 0 && (hasIp || hasDeny || geoCodes.length > 0 || hasUsers);
-
-  const { i18n } = useTranslation();
-  const visibleCountries = COUNTRY_CODES.filter((cc) => {
-    const q = geoSearch.trim().toLowerCase();
-    if (!q) return true;
-    return cc.includes(q) || countryName(cc, i18n.language).toLowerCase().includes(q);
-  });
-  const toggleGeo = (cc: string) =>
-    setGeoCodes((prev) => (prev.includes(cc) ? prev.filter((x) => x !== cc) : [...prev, cc]));
+  const canSubmit =
+    name.trim().length > 0 &&
+    (hasIp || hasDeny || geoCodes.length > 0 || geoAllowCodes.length > 0 || hasUsers);
 
   const loadingDetail = mode === 'edit' && detailQ.isLoading;
 
@@ -429,47 +486,19 @@ function AccessGroupFormModal({
             </span>
           </label>
 
-          <div className="flex flex-col gap-1.5">
-            <span className="cyber-label">
-              {t('accessGroups.geoLabel')}
-              {geoCodes.length > 0 ? ` · ${geoCodes.length}` : ''}
-            </span>
-            <input
-              className="cyber-input font-mono text-xs"
-              placeholder={t('accessGroups.geoSearchPlaceholder')}
-              value={geoSearch}
-              onChange={(e) => setGeoSearch(e.target.value)}
-            />
-            <div
-              className="grid max-h-[180px] grid-cols-2 gap-x-3 gap-y-1 overflow-y-auto rounded-sm border p-2 md:grid-cols-3"
-              style={{ borderColor: 'var(--color-separator)' }}
-            >
-              {visibleCountries.map((cc) => (
-                <label key={cc} className="flex cursor-pointer items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={geoCodes.includes(cc)}
-                    onChange={() => toggleGeo(cc)}
-                    style={{ accentColor: 'var(--color-fg)' }}
-                  />
-                  <span
-                    className="cyber-mono truncate text-xs"
-                    title={countryName(cc, i18n.language)}
-                  >
-                    {cc.toUpperCase()} · {countryName(cc, i18n.language)}
-                  </span>
-                </label>
-              ))}
-              {visibleCountries.length === 0 && (
-                <span className="cyber-mono text-xs" style={{ color: 'var(--color-muted)' }}>
-                  —
-                </span>
-              )}
-            </div>
-            <span className="cyber-mono text-xs" style={{ color: 'var(--color-muted)' }}>
-              {t('accessGroups.geoHint')}
-            </span>
-          </div>
+          <GeoPicker
+            label={t('accessGroups.geoLabel')}
+            hint={t('accessGroups.geoHint')}
+            selected={geoCodes}
+            onChange={setGeoCodes}
+          />
+
+          <GeoPicker
+            label={t('accessGroups.geoAllowLabel')}
+            hint={t('accessGroups.geoAllowHint')}
+            selected={geoAllowCodes}
+            onChange={setGeoAllowCodes}
+          />
 
           <div className="flex flex-col gap-2">
             <span className="cyber-label">{t('accessGroups.authLabel')}</span>

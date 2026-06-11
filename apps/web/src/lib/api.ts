@@ -147,6 +147,7 @@ export interface AccessGroupSummary {
   ipCount: number;
   denyCount: number;
   geoCount: number;
+  geoAllowCount: number;
   userCount: number;
   proxyHostCount: number;
   createdAt: string;
@@ -157,6 +158,7 @@ export interface AccessGroupDetail extends AccessGroupSummary {
   ipAllowlist: string[];
   ipDenylist: string[];
   geoDenylist: string[];
+  geoAllowlist: string[];
   users: { username: string; hasPassword: boolean }[];
 }
 
@@ -390,6 +392,7 @@ export const api = {
           ipAllowlist: string[];
           ipDenylist: string[];
           geoDenylist: string[];
+          geoAllowlist: string[];
           users: { username: string; password: string }[];
         },
       ) =>
@@ -406,6 +409,7 @@ export const api = {
           ipAllowlist?: string[];
           ipDenylist?: string[];
           geoDenylist?: string[];
+          geoAllowlist?: string[];
           users?: { username: string; password?: string }[];
         },
       ) =>

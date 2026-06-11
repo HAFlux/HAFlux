@@ -415,7 +415,9 @@
     "denyHint": "These IPs always get HTTP 403, checked before the allowlist and Basic Auth.",
     "geoLabel": "Blocked countries (GeoIP)",
     "geoSearchPlaceholder": "search country…",
-    "geoHint": "Requests from selected countries get HTTP 403. IP ranges are downloaded from ipdeny.com on apply and refreshed weekly."
+    "geoHint": "Requests from selected countries get HTTP 403. IP ranges are downloaded from ipdeny.com on apply and refreshed weekly.",
+    "geoAllowLabel": "// Geo allowlist (allow ONLY these countries)",
+    "geoAllowHint": "When set, requests from any other country get HTTP 403. Deny rules are checked first. IP ranges come from ipdeny.com and refresh weekly."
   },
   "backup": {
     "kicker": "// Backup",

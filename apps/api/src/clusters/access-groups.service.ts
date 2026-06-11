@@ -34,6 +34,7 @@ const CreateAccessGroupSchema = z
     ipAllowlist: z.array(z.string().min(1).max(128)).max(500),
     ipDenylist: z.array(z.string().min(1).max(128)).max(500).default([]),
     geoDenylist: z.array(CountryCodeSchema).max(250).default([]),
+    geoAllowlist: z.array(CountryCodeSchema).max(250).default([]),
     users: z.array(UserCreateSchema).max(50),
   })
   .refine(
@@ -41,6 +42,7 @@ const CreateAccessGroupSchema = z
       d.ipAllowlist.length > 0 ||
       d.ipDenylist.length > 0 ||
       d.geoDenylist.length > 0 ||
+      d.geoAllowlist.length > 0 ||
       d.users.length > 0,
     {
       message: 'At least one IP/CIDR, country, or Basic Auth user is required',
@@ -52,6 +54,7 @@ const UpdateAccessGroupSchema = z.object({
   ipAllowlist: z.array(z.string().min(1).max(128)).max(500).optional(),
   ipDenylist: z.array(z.string().min(1).max(128)).max(500).optional(),
   geoDenylist: z.array(CountryCodeSchema).max(250).optional(),
+  geoAllowlist: z.array(CountryCodeSchema).max(250).optional(),
   users: z
     .array(
       z.object({
@@ -115,6 +118,7 @@ export type AccessGroupListItem = {
   ipCount: number;
   denyCount: number;
   geoCount: number;
+  geoAllowCount: number;
   userCount: number;
   proxyHostCount: number;
   createdAt: Date;
@@ -125,6 +129,7 @@ export type AccessGroupDetail = AccessGroupListItem & {
   ipAllowlist: string[];
   ipDenylist: string[];
   geoDenylist: string[];
+  geoAllowlist: string[];
   users: { username: string; hasPassword: boolean }[];
 };
 
@@ -151,6 +156,7 @@ export class AccessGroupsService {
       const ips = (r.ipAllowlist as string[]) ?? [];
       const denies = (r.ipDenylist as string[]) ?? [];
       const geo = (r.geoDenylist as string[]) ?? [];
+      const geoAllow = (r.geoAllowlist as string[]) ?? [];
       const users = (r.authUsers as { username: string }[]) ?? [];
       return {
         id: r.id,
@@ -158,6 +164,7 @@ export class AccessGroupsService {
         ipCount: ips.length,
         denyCount: denies.length,
         geoCount: geo.length,
+        geoAllowCount: geoAllow.length,
         userCount: users.length,
         proxyHostCount: r._count.proxyHostMemberships,
         createdAt: r.createdAt,
@@ -176,6 +183,7 @@ export class AccessGroupsService {
     const ips = (r.ipAllowlist as string[]) ?? [];
     const denies = (r.ipDenylist as string[]) ?? [];
     const geo = (r.geoDenylist as string[]) ?? [];
+    const geoAllow = (r.geoAllowlist as string[]) ?? [];
     const users = (r.authUsers as { username: string; passwordEnc: string }[]) ?? [];
     return {
       id: r.id,
@@ -183,6 +191,7 @@ export class AccessGroupsService {
       ipCount: ips.length,
       denyCount: denies.length,
       geoCount: geo.length,
+      geoAllowCount: geoAllow.length,
       userCount: users.length,
       proxyHostCount: r._count.proxyHostMemberships,
       createdAt: r.createdAt,
@@ -190,6 +199,7 @@ export class AccessGroupsService {
       ipAllowlist: ips,
       ipDenylist: denies,
       geoDenylist: geo,
+      geoAllowlist: geoAllow,
       users: users.map((u) => ({
         username: u.username,
         hasPassword: !!u.passwordEnc,
@@ -226,6 +236,7 @@ export class AccessGroupsService {
         ipAllowlist: ipLines,
         ipDenylist: denyLines,
         geoDenylist: parsed.data.geoDenylist,
+        geoAllowlist: parsed.data.geoAllowlist,
         authUsers,
       },
     });
@@ -275,6 +286,11 @@ export class AccessGroupsService {
       nextGeo = parsed.data.geoDenylist;
     }
 
+    let nextGeoAllow = (existing.geoAllowlist as string[]) ?? [];
+    if (parsed.data.geoAllowlist !== undefined) {
+      nextGeoAllow = parsed.data.geoAllowlist;
+    }
+
     let nextAuth: object[] = (existing.authUsers as object[]) ?? [];
     if (parsed.data.users !== undefined) {
       const prev = (existing.authUsers as { username: string; passwordEnc: string }[]) ?? [];
@@ -304,6 +320,7 @@ export class AccessGroupsService {
       nextIp.length === 0 &&
       nextDeny.length === 0 &&
       nextGeo.length === 0 &&
+      nextGeoAllow.length === 0 &&
       nextAuth.length === 0
     ) {
       throw new AppException(
@@ -320,6 +337,7 @@ export class AccessGroupsService {
         ipAllowlist: nextIp,
         ipDenylist: nextDeny,
         geoDenylist: nextGeo,
+        geoAllowlist: nextGeoAllow,
         authUsers: nextAuth,
       },
     });
