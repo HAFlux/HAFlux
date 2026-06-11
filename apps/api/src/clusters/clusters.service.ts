@@ -142,13 +142,6 @@ export class ClustersService {
     return cluster;
   }
 
-  listNodes(clusterId: string) {
-    return this.prisma.node.findMany({
-      where: { clusterId },
-      orderBy: { name: 'asc' },
-    });
-  }
-
   async remove(id: string) {
     const cluster = await this.prisma.cluster.findUnique({ where: { id } });
     if (!cluster) throw new AppException(ErrorCode.CLUSTER_NOT_FOUND, 'Cluster not found', 404);

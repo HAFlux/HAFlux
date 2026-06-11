@@ -135,11 +135,6 @@ export class ClustersController {
     return this.svc.get(id);
   }
 
-  @Get(':id/nodes')
-  listNodes(@Param('id') id: string) {
-    return this.svc.listNodes(id);
-  }
-
   @Delete(':id')
   @HttpCode(200)
   remove(@Param('id') id: string) {
