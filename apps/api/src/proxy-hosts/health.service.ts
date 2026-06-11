@@ -39,6 +39,20 @@ function buildProbeUrl(
   return `${scheme}://${rewriteLoopback(host)}:${port}${path}`;
 }
 
+/**
+ * Link-local диапазон (169.254.0.0/16 и fe80::/10) включает cloud-metadata
+ * эндпоинт 169.254.169.254 — он никогда не легитимный upstream, но классический
+ * SSRF-таргет. Приватные сети (10/172.16/192.168) НЕ режем: upstream'ы прокси
+ * там живут штатно.
+ */
+function isLinkLocalTarget(host: string): boolean {
+  const h = host.trim().toLowerCase();
+  if (/^169\.254\.\d{1,3}\.\d{1,3}$/.test(h)) return true;
+  if (h === 'fd00:ec2::254') return true; // IMDSv6 (AWS)
+  if (/^fe80:/.test(h)) return true;
+  return false;
+}
+
 /** Заголовок Host как у клиентов за HAProxy (vhost на upstream). Wildcard в UI не подставляем. */
 function hostHeaderForProbe(publicDomain: string): string | undefined {
   const d = publicDomain.trim();
@@ -132,6 +146,14 @@ export class ProxyHostsHealthService implements OnModuleInit, OnModuleDestroy {
   }> {
     if (scheme === 'udp') {
       return { status: 'UNKNOWN', code: null, latencyMs: null, error: 'UDP probe not supported' };
+    }
+    if (isLinkLocalTarget(host)) {
+      return {
+        status: 'UNKNOWN',
+        code: null,
+        latencyMs: null,
+        error: 'link-local / metadata addresses are not allowed',
+      };
     }
     if (scheme === 'tcp') {
       return this.probeTcp(host, port);

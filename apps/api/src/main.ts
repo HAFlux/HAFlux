@@ -9,9 +9,16 @@ import { AppModule } from './app.module';
 import { SpaFallbackFilter } from './spa.filter';
 
 async function bootstrap() {
+  // trustProxy: доверяем X-Forwarded-* только от нашего фронтового HAProxy.
+  // `true` означало бы доверие любому клиентскому X-Forwarded-For — тогда
+  // brute-force throttle по IP обходится подменой заголовка. По умолчанию
+  // HAProxy ходит на api с loopback; список можно расширить через TRUSTED_PROXIES.
+  const trustProxy = process.env.TRUSTED_PROXIES?.trim()
+    ? process.env.TRUSTED_PROXIES.split(',').map((s) => s.trim())
+    : ['127.0.0.1/8', '::1/128'];
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter({ trustProxy: true, bodyLimit: 100 * 1024 * 1024 }),
+    new FastifyAdapter({ trustProxy, bodyLimit: 100 * 1024 * 1024 }),
   );
 
   app.useGlobalPipes(

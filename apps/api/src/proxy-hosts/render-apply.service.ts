@@ -261,7 +261,7 @@ export class ProxyHostsRenderApplyService {
       try {
         // ВАЖНО: writeFile перезаписывает по тому же inode — single-file
         // bind mount в haproxy контейнере видит новое содержимое.
-        await fs.writeFile(cfgPath, cfg, { mode: 0o644 });
+        await fs.writeFile(cfgPath, cfg, { mode: 0o640 }); // содержит userlist с basic-auth — не world-readable
       } catch (err) {
         this.logger.error('Failed to write haproxy.cfg', err as Error);
         throw new AppException(ErrorCode.INTERNAL, 'Failed to write haproxy.cfg', 500);
