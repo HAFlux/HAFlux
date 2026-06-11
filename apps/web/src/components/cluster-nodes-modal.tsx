@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Modal } from '@/components/modal';
-import { type ClusterNode, type ClusterNodeInput, ApiError, api } from '@/lib/api';
+import { ApiError, type ClusterNode, type ClusterNodeInput, api } from '@/lib/api';
 
 type FormState = {
   name: string;
@@ -84,7 +84,7 @@ export function ClusterNodesModal({
     queryKey: ['ssh-key'],
     queryFn: () => api.sshKey.get(),
     enabled: open,
-    staleTime: Infinity,
+    staleTime: Number.POSITIVE_INFINITY,
   });
 
   const [editing, setEditing] = useState<string | 'new' | null>(null);
@@ -167,7 +167,11 @@ export function ClusterNodesModal({
               >
                 {sshKeyQ.data.publicKey}
               </code>
-              <button type="button" className="cyber-btn cyber-btn-ghost shrink-0" onClick={copyKey}>
+              <button
+                type="button"
+                className="cyber-btn cyber-btn-ghost shrink-0"
+                onClick={copyKey}
+              >
                 {keyCopied ? '✓' : t('actions.copy')}
               </button>
             </div>

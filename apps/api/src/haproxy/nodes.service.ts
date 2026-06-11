@@ -42,10 +42,10 @@ const NodeBaseSchema = z.object({
   role: z.enum(['PRIMARY', 'SECONDARY']).default('SECONDARY'),
 });
 
-const CreateNodeSchema = NodeBaseSchema.refine(
-  (d) => d.transport === 'LOCAL' || !!d.sshHost,
-  { message: 'sshHost is required for SSH transport', path: ['sshHost'] },
-);
+const CreateNodeSchema = NodeBaseSchema.refine((d) => d.transport === 'LOCAL' || !!d.sshHost, {
+  message: 'sshHost is required for SSH transport',
+  path: ['sshHost'],
+});
 
 const UpdateNodeSchema = NodeBaseSchema.partial();
 

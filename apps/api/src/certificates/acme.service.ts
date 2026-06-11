@@ -46,7 +46,10 @@ type AcmeWithAxios = typeof acme & {
   axios?: { defaults: { timeout: number } };
 };
 const acmeWithAxios = acme as AcmeWithAxios;
-if (acmeWithAxios.axios?.defaults && acmeWithAxios.axios.defaults.timeout !== ACME_HTTP_TIMEOUT_MS) {
+if (
+  acmeWithAxios.axios?.defaults &&
+  acmeWithAxios.axios.defaults.timeout !== ACME_HTTP_TIMEOUT_MS
+) {
   acmeWithAxios.axios.defaults.timeout = ACME_HTTP_TIMEOUT_MS;
 }
 

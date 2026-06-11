@@ -59,7 +59,9 @@ export class BootstrapService implements OnModuleInit {
         lastSeenAt: new Date(),
       },
     });
-    this.logger.log(`Created LOCAL node for cluster "${oldest.name}" (node-aware deploy migration)`);
+    this.logger.log(
+      `Created LOCAL node for cluster "${oldest.name}" (node-aware deploy migration)`,
+    );
   }
 
   private async bootstrap(): Promise<void> {

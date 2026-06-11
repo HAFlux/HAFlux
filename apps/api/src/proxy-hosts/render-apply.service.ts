@@ -386,9 +386,7 @@ export class ProxyHostsRenderApplyService {
    * последующий reload.
    */
   private async validateCfg(): Promise<{ ok: boolean; output: string }> {
-    const cmd =
-      `docker exec ${this.haproxyContainer} haproxy -c ` +
-      '-f /usr/local/etc/haproxy/haproxy.cfg -f /usr/local/etc/haproxy/conf.d/';
+    const cmd = `docker exec ${this.haproxyContainer} haproxy -c -f /usr/local/etc/haproxy/haproxy.cfg -f /usr/local/etc/haproxy/conf.d/`;
     try {
       const { stdout, stderr } = await execAsync(cmd, { timeout: 15_000 });
       return { ok: true, output: (stdout || stderr).trim() };

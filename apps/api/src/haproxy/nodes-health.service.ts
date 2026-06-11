@@ -74,8 +74,7 @@ export class NodesHealthService implements OnModuleInit, OnModuleDestroy {
         this.prisma.node.update({ where: { id: candidate.id }, data: { role: 'PRIMARY' } }),
       ]);
       this.logger.warn(
-        `ACTIVE_PASSIVE failover in cluster "${c.name}": ${primary.name} (OFFLINE) → ${candidate.name} promoted to PRIMARY. ` +
-          'Traffic failover requires VIP/keepalived on the infrastructure side.',
+        `ACTIVE_PASSIVE failover in cluster "${c.name}": ${primary.name} (OFFLINE) → ${candidate.name} promoted to PRIMARY. Traffic failover requires VIP/keepalived on the infrastructure side.`,
       );
     }
   }

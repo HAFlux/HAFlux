@@ -7,7 +7,7 @@ import { Help } from '@/components/help';
 import { Modal } from '@/components/modal';
 import { PageHeader } from '@/components/page-header';
 import { PanelLoader } from '@/components/panel-loader';
-import { type ApplyResult, ApiError, api } from '@/lib/api';
+import { ApiError, type ApplyResult, api } from '@/lib/api';
 
 type ClusterMode = 'STANDALONE' | 'ACTIVE_PASSIVE' | 'ACTIVE_ACTIVE';
 const MODE_VALUES: ClusterMode[] = ['STANDALONE', 'ACTIVE_PASSIVE', 'ACTIVE_ACTIVE'];
