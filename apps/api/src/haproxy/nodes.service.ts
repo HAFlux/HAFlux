@@ -15,15 +15,18 @@ const SafeName = z
   .regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/, {
     message: 'allowed: letters, digits, dot, underscore, dash',
   });
+const noDotDot = (s: string) => !s.split('/').includes('..');
 const SafePath = z
   .string()
   .min(1)
   .max(256)
-  .regex(/^\/[a-zA-Z0-9._\/-]*$/, { message: 'must be an absolute path without special chars' });
+  .regex(/^\/[a-zA-Z0-9._\/-]*$/, { message: 'must be an absolute path without special chars' })
+  .refine(noDotDot, { message: 'path traversal (..) is not allowed' });
 const SafeTarget = z
   .string()
   .max(256)
-  .regex(/^[a-zA-Z0-9._\/-]*$/, { message: 'no spaces or shell metacharacters allowed' });
+  .regex(/^[a-zA-Z0-9._\/-]*$/, { message: 'no spaces or shell metacharacters allowed' })
+  .refine(noDotDot, { message: 'path traversal (..) is not allowed' });
 const HostSchema = z
   .string()
   .min(1)

@@ -1,4 +1,4 @@
-import { exec } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -6,7 +6,9 @@ import { Node } from '@prisma/client';
 import { RenderedTree } from '../types';
 import { NodeTransport } from './transport.interface';
 
-const execAsync = promisify(exec);
+// execFile (не exec) — без шелла: аргументы не интерполируются в команду,
+// поэтому reloadTarget/pidfile/socket не могут вырваться в shell-инъекцию.
+const execFileAsync = promisify(execFile);
 
 /**
  * Транспорт для нод, которые живут на той же машине, что и api (через shared docker volume).
@@ -44,34 +46,49 @@ export class LocalTransport implements NodeTransport {
 
   async validate(): Promise<{ stdout: string; stderr: string }> {
     const target = this.node.reloadTarget ?? 'haproxy-balancer';
-    const cmd = [
-      'docker exec',
-      target,
-      'haproxy -c',
-      '-f /usr/local/etc/haproxy/haproxy.cfg',
-      '-f /usr/local/etc/haproxy/conf.d/',
-    ].join(' ');
-
-    return execAsync(cmd, { timeout: 15_000 });
+    return execFileAsync(
+      'docker',
+      [
+        'exec',
+        target,
+        'haproxy',
+        '-c',
+        '-f',
+        '/usr/local/etc/haproxy/haproxy.cfg',
+        '-f',
+        '/usr/local/etc/haproxy/conf.d/',
+      ],
+      { timeout: 15_000 },
+    );
   }
 
   async reload(): Promise<void> {
     const target = this.node.reloadTarget ?? 'haproxy-balancer';
     switch (this.node.reloadMode) {
       case 'CONTAINER':
-        await execAsync(`docker kill -s USR2 ${target}`, { timeout: 10_000 });
+        await execFileAsync('docker', ['kill', '-s', 'USR2', target], { timeout: 10_000 });
         return;
       case 'SYSTEMD':
-        await execAsync(`systemctl reload ${target || 'haproxy'}`, { timeout: 10_000 });
+        await execFileAsync('systemctl', ['reload', target || 'haproxy'], { timeout: 10_000 });
         return;
       case 'SIGNAL': {
         const pidfile = target || '/var/run/haproxy.pid';
-        await execAsync(`kill -USR2 $(cat ${pidfile})`, { timeout: 10_000 });
+        const pid = (await fs.readFile(pidfile, 'utf8')).trim();
+        if (!/^\d+$/.test(pid)) throw new Error(`Invalid pid in ${pidfile}`);
+        await execFileAsync('kill', ['-USR2', pid], { timeout: 10_000 });
         return;
       }
       case 'MASTER_CLI': {
         const sock = target || '/var/run/haproxy/admin.sock';
-        await execAsync(`echo "reload" | socat - UNIX-CONNECT:${sock}`, { timeout: 10_000 });
+        // socat читает команду из stdin — без шелл-пайпа.
+        const child = execFile('socat', ['-', `UNIX-CONNECT:${sock}`], { timeout: 10_000 });
+        child.stdin?.end('reload\n');
+        await new Promise<void>((resolve, reject) => {
+          child.on('error', reject);
+          child.on('close', (code) =>
+            code === 0 ? resolve() : reject(new Error(`socat exited ${code}`)),
+          );
+        });
         return;
       }
     }
