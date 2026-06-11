@@ -35,7 +35,8 @@ export class LoginThrottleService implements OnModuleDestroy {
         this.redisHealthy = true;
       });
       this.redis.on('error', (err) => {
-        if (this.redisHealthy) this.logger.warn(`redis error, using in-memory throttle: ${err.message}`);
+        if (this.redisHealthy)
+          this.logger.warn(`redis error, using in-memory throttle: ${err.message}`);
         this.redisHealthy = false;
       });
     } else {
