@@ -6,7 +6,7 @@ import { Modal } from '@/components/modal';
 import { PageHeader } from '@/components/page-header';
 import { PanelLoader } from '@/components/panel-loader';
 import { type AccessGroupSummary, ApiError, api } from '@/lib/api';
-import { COUNTRY_CODES, countryFlag, countryName } from '@/lib/countries';
+import { COUNTRY_CODES, countryFlagUrl, countryName } from '@/lib/countries';
 
 function GeoPicker({
   label,
@@ -52,8 +52,17 @@ function GeoPicker({
               onChange={() => toggle(cc)}
               style={{ accentColor: 'var(--color-fg)' }}
             />
+            <img
+              src={countryFlagUrl(cc)}
+              alt=""
+              width={20}
+              height={15}
+              loading="lazy"
+              className="shrink-0 rounded-[2px] border"
+              style={{ borderColor: 'var(--color-separator)' }}
+            />
             <span className="cyber-mono truncate text-xs" title={countryName(cc, i18n.language)}>
-              {countryFlag(cc)} {cc.toUpperCase()} · {countryName(cc, i18n.language)}
+              {cc.toUpperCase()} · {countryName(cc, i18n.language)}
             </span>
           </label>
         ))}

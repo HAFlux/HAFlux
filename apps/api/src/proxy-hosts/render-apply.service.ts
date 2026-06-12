@@ -90,6 +90,7 @@ export class ProxyHostsRenderApplyService {
   private readonly logger = new Logger(ProxyHostsRenderApplyService.name);
   private readonly dataDir: string;
   private readonly certsDirInContainer = '/etc/haproxy/certs';
+  private readonly geoBlockFile = '/etc/haproxy/errors/geoblock.html';
   private readonly haproxyContainer: string;
   private readonly webPort: number;
   private readonly apiPort: number;
@@ -433,6 +434,10 @@ export class ProxyHostsRenderApplyService {
       await fs.writeFile(path.join(errDir, `${code}.http`), payload, { mode: 0o644 });
       out.set(`errors/${code}.http`, payload);
     }
+    // Страница геоблокировки — body для `http-request return ... file`.
+    const geoBlock = this.renderGeoBlockHtml();
+    await fs.writeFile(path.join(errDir, 'geoblock.html'), geoBlock, { mode: 0o644 });
+    out.set('errors/geoblock.html', geoBlock);
     return out;
   }
 
@@ -446,6 +451,41 @@ export class ProxyHostsRenderApplyService {
   /** Дефолтное HTML (как в шаблоне HAFlux), без слоя HTTP. */
   defaultErrorPageHtml(code: number): string {
     return this.renderErrorHtml(code);
+  }
+
+  /**
+   * Страница геоблокировки (HTML-body для `http-request return ... file`).
+   * Отдельная от общего 403, чтобы посетителю было понятно, что дело в регионе.
+   */
+  private renderGeoBlockHtml(): string {
+    return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>403 Region blocked</title>
+<style>
+:root{color-scheme:light dark}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden}
+body{background:#fff;color:#000;font-family:'Geist Mono',ui-monospace,SFMono-Regular,Menlo,monospace;display:flex;align-items:center;justify-content:center;padding:2rem}
+@media(prefers-color-scheme:dark){body{background:#000;color:#fff}}
+.card{max-width:540px;width:100%;border:1px solid currentColor;opacity:.92;padding:2rem 2rem 1.5rem;border-radius:2px}
+.label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;opacity:.55}
+h1{font-size:2.5rem;margin:.5rem 0 .25rem;letter-spacing:-.015em}
+h1::before{content:'> ';opacity:.55}
+p{margin:1rem 0 0;line-height:1.6;opacity:.8;font-size:14px}
+.meta{margin-top:1.5rem;font-size:11px;opacity:.55;display:flex;gap:1rem;flex-wrap:wrap}
+.scan{background-image:repeating-linear-gradient(180deg,transparent 0,transparent 3px,rgba(127,127,127,.05) 3px,rgba(127,127,127,.05) 4px)}
+</style></head>
+<body class="scan">
+<div class="card">
+<div class="label">[ HAFlux · 403 ]</div>
+<h1>Region blocked</h1>
+<p>Access to this site is not available from your region / country.</p>
+<div class="meta"><span>HAFlux</span><span>code: 403</span></div>
+</div>
+</body></html>`;
   }
 
   private statusText(code: number): string {
@@ -572,6 +612,11 @@ p{margin:1rem 0 0;line-height:1.6;opacity:.8;font-size:14px}
     return `geo_${cc}_src`;
   }
 
+  /** Гео-правило: отдать страницу геоблокировки (403) при совпадении условия. */
+  private geoBlockRule(hostId: string, cond: string): string {
+    return `  http-request return status 403 content-type "text/html" file ${this.geoBlockFile} if host_${hostId} ${cond}`;
+  }
+
   private escapePwdForUserlist(p: string): string {
     if (/^[a-zA-Z0-9._~:-]+$/.test(p)) return p;
     return `"${p.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
@@ -696,11 +741,13 @@ global
       for (const h of httpHosts) {
         for (const gid of h.accessGroupIds) {
           const g = groupsById.get(gid);
-          // denylist/гео действуют всегда, даже на хостах с редиректом на HTTPS
+          // denylist/гео (deny и allow) действуют всегда, даже на хостах с
+          // редиректом на HTTPS — гео-правила рендерятся в блоке 0 до redirect,
+          // поэтому ACL должны быть объявлены безусловно.
           if (g?.hasDeny) feHttpDenyGroupIds.add(gid);
           for (const cc of g?.geoCodes ?? []) feHttpGeoCodes.add(cc);
-          if (h.ssl && h.httpToHttps) continue;
           for (const cc of g?.geoAllowCodes ?? []) feHttpGeoCodes.add(cc);
+          if (h.ssl && h.httpToHttps) continue;
           if (g?.hasIp) feHttpGroupIds.add(gid);
         }
       }
@@ -730,8 +777,17 @@ global
           );
         }
         for (const cc of g.geoCodes) {
-          out.push(`  http-request deny deny_status 403 if host_${h.id} ${this.aclGeoName(cc)}`);
+          out.push(this.geoBlockRule(h.id, this.aclGeoName(cc)));
         }
+      }
+      // Гео-allowlist (пускать только из стран X) — тоже до redirect, чтобы
+      // посетитель из чужой страны сразу получил страницу геоблокировки, а не 301.
+      const geoAllow = Array.from(
+        new Set(h.accessGroupIds.flatMap((gid) => groupsById.get(gid)?.geoAllowCodes ?? [])),
+      );
+      if (geoAllow.length > 0) {
+        const negations = geoAllow.map((cc) => `!${this.aclGeoName(cc)}`).join(' ');
+        out.push(this.geoBlockRule(h.id, negations));
       }
     }
 
@@ -764,14 +820,7 @@ global
         const negations = ipGids.map((gid) => `!${this.aclSrcName(gid)}`).join(' ');
         out.push(`  http-request deny deny_status 403 if host_${h.id} ${negations}`);
       }
-      // Гео-allowlist: доступ только из перечисленных стран (объединение по группам).
-      const geoAllow = Array.from(
-        new Set(h.accessGroupIds.flatMap((gid) => groupsById.get(gid)?.geoAllowCodes ?? [])),
-      );
-      if (geoAllow.length > 0) {
-        const negations = geoAllow.map((cc) => `!${this.aclGeoName(cc)}`).join(' ');
-        out.push(`  http-request deny deny_status 403 if host_${h.id} ${negations}`);
-      }
+      // Гео-allowlist для :80 уже отрендерен в блоке 0 (до redirect).
       const needsAuth = h.accessGroupIds.some((gid) => groupsById.get(gid)?.hasAuth);
       if (needsAuth) {
         const ulName = this.hostMergedUlName(h.id);
@@ -862,7 +911,7 @@ global
             );
           }
           for (const cc of g.geoCodes) {
-            out.push(`  http-request deny deny_status 403 if host_${h.id} ${this.aclGeoName(cc)}`);
+            out.push(this.geoBlockRule(h.id, this.aclGeoName(cc)));
           }
         }
       }
@@ -890,7 +939,7 @@ global
         );
         if (geoAllow.length > 0) {
           const negations = geoAllow.map((cc) => `!${this.aclGeoName(cc)}`).join(' ');
-          out.push(`  http-request deny deny_status 403 if host_${h.id} ${negations}`);
+          out.push(this.geoBlockRule(h.id, negations));
         }
         const needsAuth = h.accessGroupIds.some((gid) => groupsById.get(gid)?.hasAuth);
         if (needsAuth) {
