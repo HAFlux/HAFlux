@@ -273,9 +273,13 @@ export function countryName(code: string, lang: string): string {
   }
 }
 
-/** Эмодзи-флаг страны из ISO-кода: 'ru' → 🇷🇺 (региональные индикаторы Unicode). */
-export function countryFlag(code: string): string {
-  const cc = code.toUpperCase();
-  if (!/^[A-Z]{2}$/.test(cc)) return '';
-  return String.fromCodePoint(0x1f1e6 + (cc.charCodeAt(0) - 65), 0x1f1e6 + (cc.charCodeAt(1) - 65));
+/**
+ * URL флага-картинки страны (flagcdn.com, SVG). Эмодзи-флаги (региональные
+ * индикаторы) не рендерятся в Chrome на Windows — показывают буквы кода, —
+ * поэтому используем растровый/SVG-флаг как <img>.
+ */
+export function countryFlagUrl(code: string): string {
+  const cc = code.toLowerCase();
+  if (!/^[a-z]{2}$/.test(cc)) return '';
+  return `https://flagcdn.com/${cc}.svg`;
 }
