@@ -1,5 +1,5 @@
 ## ─── Builder ─────────────────────────────────────────────────────────────
-FROM node:22-alpine AS builder
+FROM node:26-alpine AS builder
 WORKDIR /repo
 
 # Тег релиза (например v0.1.0) пробрасывается release.yml через --build-arg
@@ -37,7 +37,7 @@ RUN pnpm --filter @haflux/contracts build \
  && pnpm --filter @haflux/api deploy --legacy --prod /out
 
 ## ─── Runtime ─────────────────────────────────────────────────────────────
-FROM node:22-alpine AS runtime
+FROM node:26-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
